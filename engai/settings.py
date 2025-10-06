@@ -194,3 +194,31 @@ CHANNEL_LAYERS = {
 
 # Mistral AI settings
 MISTRAL_API_KEY = '0A5W69RwK9MujYvIHldRXUihWehJKM7M'
+
+# Настройки безопасности для загрузки файлов
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
+# Настройки для кастомных страниц ошибок
+# Для включения кастомных страниц ошибок в production установите DEBUG = False
+# В режиме разработки для тестирования 404 используйте URL: /404-test/
+USE_CUSTOM_ERROR_PAGES = True
+FILE_UPLOAD_PERMISSIONS = 0o644
+
+# Разрешенные типы файлов для загрузки
+ALLOWED_FILE_EXTENSIONS = {
+    'images': ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'],
+    'documents': ['.pdf', '.doc', '.docx', '.txt'],
+    'archives': ['.zip', '.rar']
+}
+
+# Максимальный размер файла для каждого типа (в байтах)
+MAX_FILE_SIZES = {
+    'images': 5 * 1024 * 1024,  # 5MB для изображений
+    'documents': 10 * 1024 * 1024,  # 10MB для документов
+    'archives': 10 * 1024 * 1024,  # 10MB для архивов
+}
+
+# Настройки безопасности
+SECURE_FILE_UPLOAD = True
+SCAN_UPLOADED_FILES = True  # В будущем можно добавить антивирусное сканирование

@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block title %}Ошибка сервера - EngAI{% endblock %}
+
+{% block extra_css %}
+<style>
+body {
+    background: linear-gradient(135deg, #f8f5ff 0%, #e6d9ff 100%);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+.error-500-container {
+    max-width: 600px;
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(124, 77, 255, 0.1);
+    backdrop-filter: blur(10px);
+    animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.error-icon {
+    font-size: 120px;
+    color: #ff6b6b;
+    margin-bottom: 20px;
+    animation: shake 2s infinite;
+}
+
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-5px);
+    }
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+.error-title {
+    font-size: 3rem;
+    color: #ff6b6b;
+    font-weight: 700;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #ff6b6b, #ff4757);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.error-subtitle {
+    font-size: 1.5rem;
+    color: #666;
+    margin-bottom: 30px;
+    font-weight: 300;
+}
+
+.error-message {
+    font-size: 1.1rem;
+    color: #777;
+    margin-bottom: 40px;
+    line-height: 1.6;
+}
+
+.error-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 14px 28px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #7c4dff, #6a3edb);
+    color: white;
+    box-shadow: 0 8px 25px rgba(124, 77, 255, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(124, 77, 255, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(124, 77, 255, 0.1);
+    color: #7c4dff;
+    border: 2px solid #7c4dff;
+}
+
+.btn-secondary:hover {
+    background: #7c4dff;
+    color: white;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(124, 77, 255, 0.3);
+}
+
+@media (max-width: 768px) {
+    .error-500-container {
+        margin: 20px;
+        padding: 30px 15px;
+    }
+    
+    .error-title {
+        font-size: 2.5rem;
+    }
+    
+    .error-subtitle {
+        font-size: 1.3rem;
+    }
+    
+    .error-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="error-500-container">
+    <div class="error-icon">⚠️</div>
+    
+    <h1 class="error-title">500</h1>
+    <h2 class="error-subtitle">Ошибка сервера</h2>
+    
+    <div class="error-message">
+        <p>Произошла внутренняя ошибка сервера.</p>
+        <p>Мы уже знаем об этой проблеме и работаем над её устранением.</p>
+        <p>Попробуйте обновить страницу через несколько минут.</p>
+    </div>
+    
+    <div class="error-actions">
+        <a href="/" class="btn btn-primary">
+            🏠 Вернуться на главную
+        </a>
+        <a href="javascript:location.reload()" class="btn btn-secondary">
+            🔄 Обновить страницу
+        </a>
+    </div>
+</div>
+{% endblock %}

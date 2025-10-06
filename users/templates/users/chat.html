@@ -1,0 +1,783 @@
+{% extends 'users/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .chat-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        height: calc(100vh - 40px);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-header {
+        background: white;
+        border-radius: 20px 20px 0 0;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        border-bottom: 1px solid rgba(102, 126, 234, 0.1);
+        position: sticky;
+        top: 0;
+        z-index: 100;
+    }
+
+    .back-btn {
+        color: #667eea;
+        font-size: 1.5rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+        padding: 8px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .back-btn:hover {
+        background: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+        text-decoration: none;
+    }
+
+    .chat-user-info {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        flex: 1;
+    }
+
+    .chat-user-avatar {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.3rem;
+        font-weight: bold;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .chat-user-details h2 {
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #2d3748;
+        margin: 0 0 5px 0;
+    }
+
+    .chat-user-details p {
+        font-size: 0.9rem;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    /* Область сообщений */
+    .chat-messages {
+        flex: 1;
+        background: #f8fafc;
+        padding: 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        border-left: 1px solid rgba(102, 126, 234, 0.1);
+        border-right: 1px solid rgba(102, 126, 234, 0.1);
+    }
+
+    .message {
+        display: flex;
+        align-items: flex-end;
+        gap: 10px;
+        animation: fadeInUp 0.3s ease;
+    }
+
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .message.own {
+        flex-direction: row-reverse;
+    }
+
+    .message-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.9rem;
+        font-weight: bold;
+        flex-shrink: 0;
+    }
+
+    .message.own .message-avatar {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    }
+
+    .message-content {
+        max-width: 70%;
+        position: relative;
+    }
+
+    .message-bubble {
+        background: white;
+        border-radius: 18px 18px 18px 4px;
+        padding: 12px 16px;
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        word-wrap: break-word;
+        line-height: 1.4;
+    }
+
+    .message.own .message-bubble {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 18px 18px 4px 18px;
+        border: none;
+    }
+
+    .message-time {
+        font-size: 0.75rem;
+        color: #9ca3af;
+        margin-top: 5px;
+        text-align: right;
+    }
+
+    .message.own .message-time {
+        color: rgba(255, 255, 255, 0.8);
+        text-align: left;
+    }
+
+    /* Сообщения с файлами */
+    .file-message {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 2px dashed #e2e8f0;
+        transition: all 0.3s ease;
+    }
+
+    .message.own .file-message {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .file-message:hover {
+        border-color: #667eea;
+        background: rgba(102, 126, 234, 0.05);
+    }
+
+    .file-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        flex-shrink: 0;
+    }
+
+    .file-icon.image {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+
+    .file-icon.document {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+        color: white;
+    }
+
+    .file-info h4 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #2d3748;
+        margin: 0 0 3px 0;
+    }
+
+    .message.own .file-info h4 {
+        color: white;
+    }
+
+    .file-info p {
+        font-size: 0.8rem;
+        color: #6b7280;
+        margin: 0;
+    }
+
+    .message.own .file-info p {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* Изображения в сообщениях */
+    .image-message {
+        max-width: 300px;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .image-message img {
+        width: 100%;
+        height: auto;
+        display: block;
+        cursor: pointer;
+        transition: transform 0.3s ease;
+    }
+
+    .image-message img:hover {
+        transform: scale(1.02);
+    }
+
+    /* Область ввода */
+    .chat-input {
+        background: white;
+        border-radius: 0 0 20px 20px;
+        padding: 20px;
+        border-top: 1px solid rgba(102, 126, 234, 0.1);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .input-form {
+        display: flex;
+        align-items: flex-end;
+        gap: 12px;
+    }
+
+    .input-wrapper {
+        flex: 1;
+        position: relative;
+    }
+
+    .message-input {
+        width: 100%;
+        min-height: 44px;
+        max-height: 120px;
+        padding: 12px 50px 12px 16px;
+        border: 2px solid #e2e8f0;
+        border-radius: 22px;
+        font-size: 1rem;
+        resize: none;
+        transition: all 0.3s ease;
+        font-family: inherit;
+    }
+
+    .message-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .input-actions {
+        position: absolute;
+        right: 8px;
+        bottom: 8px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .file-upload-btn, .emoji-btn {
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: 50%;
+        background: #f3f4f6;
+        color: #6b7280;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.9rem;
+    }
+
+    .file-upload-btn:hover, .emoji-btn:hover {
+        background: #667eea;
+        color: white;
+        transform: scale(1.1);
+    }
+
+    .send-btn {
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .send-btn:hover:not(:disabled) {
+        transform: scale(1.1);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .send-btn:disabled {
+        background: #e5e7eb;
+        color: #9ca3af;
+        cursor: not-allowed;
+    }
+
+    /* Скрытый input для файлов */
+    .file-input {
+        display: none;
+    }
+
+    /* Индикатор загрузки */
+    .loading-indicator {
+        display: none;
+        text-align: center;
+        padding: 20px;
+        color: #6b7280;
+        font-style: italic;
+    }
+
+    .loading-indicator.show {
+        display: block;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 768px) {
+        .chat-container {
+            padding: 10px;
+            height: calc(100vh - 20px);
+        }
+
+        .chat-header {
+            padding: 15px;
+            border-radius: 15px 15px 0 0;
+        }
+
+        .chat-user-avatar {
+            width: 40px;
+            height: 40px;
+            font-size: 1.1rem;
+        }
+
+        .chat-user-details h2 {
+            font-size: 1.1rem;
+        }
+
+        .chat-messages {
+            padding: 15px;
+        }
+
+        .message-content {
+            max-width: 85%;
+        }
+
+        .chat-input {
+            padding: 15px;
+            border-radius: 0 0 15px 15px;
+        }
+
+        .message-input {
+            font-size: 0.95rem;
+        }
+    }
+
+    /* Кастомный скроллбар */
+    .chat-messages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+        background: #f1f5f9;
+        border-radius: 3px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <!-- Заголовок чата -->
+    <div class="chat-header">
+        <a href="{% url 'messages' %}" class="back-btn">
+            <i class="bi bi-arrow-left"></i>
+        </a>
+        <div class="chat-user-info">
+            <div class="chat-user-avatar">
+                {{ other_user.get_full_name.0|upper|default:other_user.email.0|upper }}
+            </div>
+            <div class="chat-user-details">
+                <h2>{{ other_user.get_full_name|default:other_user.email }}</h2>
+                <p>
+                    <i class="bi bi-person"></i>
+                    {{ other_user.get_current_language_level_display }} → {{ other_user.get_desired_language_level_display }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Область сообщений -->
+    <div class="chat-messages" id="chatMessages">
+        {% for message in messages %}
+            <div class="message {% if message.sender == user %}own{% endif %}" data-message-id="{{ message.id }}">
+                <div class="message-avatar">
+                    {{ message.sender.get_full_name.0|upper|default:message.sender.email.0|upper }}
+                </div>
+                <div class="message-content">
+                    {% if message.message_type == 'text' %}
+                        <div class="message-bubble">
+                            {{ message.content|linebreaks }}
+                        </div>
+                    {% elif message.message_type == 'image' %}
+                        <div class="image-message">
+                            <img src="{{ message.file.url }}" alt="{{ message.file_name }}" onclick="openImageModal(this.src)">
+                        </div>
+                    {% else %}
+                        <div class="message-bubble">
+                            <div class="file-message">
+                                <div class="file-icon document">
+                                    <i class="bi bi-file-earmark"></i>
+                                </div>
+                                <div class="file-info">
+                                    <h4>{{ message.file_name }}</h4>
+                                    <p>{{ message.file_size_human }} • <a href="{{ message.file.url }}" download>Скачать</a></p>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    <div class="message-time">
+                        {{ message.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="empty-chat">
+                <div style="text-align: center; padding: 40px; color: #6b7280;">
+                    <i class="bi bi-chat-heart" style="font-size: 3rem; margin-bottom: 15px; color: #667eea;"></i>
+                    <h3>Начните общение!</h3>
+                    <p>Отправьте первое сообщение {{ other_user.get_full_name|default:other_user.email }}</p>
+                </div>
+            </div>
+        {% endfor %}
+        
+        <!-- Индикатор загрузки -->
+        <div class="loading-indicator" id="loadingIndicator">
+            <i class="bi bi-three-dots"></i> Отправка...
+        </div>
+    </div>
+
+    <!-- Область ввода -->
+    <div class="chat-input">
+        <form class="input-form" id="messageForm">
+            {% csrf_token %}
+            <input type="hidden" name="chat_id" value="{{ chat.id }}">
+            
+            <div class="input-wrapper">
+                <textarea 
+                    class="message-input" 
+                    id="messageInput" 
+                    name="content" 
+                    placeholder="Введите сообщение..."
+                    rows="1"></textarea>
+                
+                <div class="input-actions">
+                    <button type="button" class="file-upload-btn" onclick="document.getElementById('fileInput').click()">
+                        <i class="bi bi-paperclip"></i>
+                    </button>
+                    <input type="file" id="fileInput" class="file-input" accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar">
+                </div>
+            </div>
+            
+            <button type="submit" class="send-btn" id="sendBtn">
+                <i class="bi bi-send"></i>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Модальное окно для просмотра изображений -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="background: transparent; border: none;">
+            <div class="modal-body text-center" style="padding: 0;">
+                <img id="modalImage" src="" style="max-width: 100%; max-height: 80vh; border-radius: 12px;">
+                <button type="button" class="btn-close position-absolute top-0 end-0 m-3" 
+                        data-bs-dismiss="modal" style="background: white; border-radius: 50%; padding: 10px;"></button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let lastMessageId = {{ messages.0.id|default:0 }};
+let isLoading = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const chatMessages = document.getElementById('chatMessages');
+    const fileInput = document.getElementById('fileInput');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    
+    // Прокрутка к последнему сообщению
+    scrollToBottom();
+    
+    // Автоматическое изменение высоты textarea
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        
+        // Активация/деактивация кнопки отправки
+        sendBtn.disabled = this.value.trim() === '';
+    });
+    
+    // Отправка сообщения по Enter (Shift+Enter для новой строки)
+    messageInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            if (!sendBtn.disabled && !isLoading) {
+                messageForm.dispatchEvent(new Event('submit'));
+            }
+        }
+    });
+    
+    // Отправка текстового сообщения
+    messageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (isLoading) return;
+        
+        const content = messageInput.value.trim();
+        if (!content) return;
+        
+        sendMessage(content);
+    });
+    
+    // Загрузка файла
+    fileInput.addEventListener('change', function() {
+        const file = this.files[0];
+        if (file) {
+            uploadFile(file);
+        }
+    });
+    
+    // Периодическое обновление сообщений
+    setInterval(loadNewMessages, 3000);
+});
+
+// Отправка текстового сообщения
+function sendMessage(content) {
+    if (isLoading) return;
+    
+    isLoading = true;
+    showLoading(true);
+    
+    const formData = new FormData();
+    formData.append('chat_id', '{{ chat.id }}');
+    formData.append('content', content);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "send_message" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addMessageToChat(data.message);
+            document.getElementById('messageInput').value = '';
+            document.getElementById('messageInput').style.height = 'auto';
+            document.getElementById('sendBtn').disabled = true;
+            scrollToBottom();
+            lastMessageId = data.message.id;
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Произошла ошибка при отправке сообщения', 'error');
+    })
+    .finally(() => {
+        isLoading = false;
+        showLoading(false);
+    });
+}
+
+// Загрузка файла
+function uploadFile(file) {
+    if (isLoading) return;
+    
+    // Проверка размера файла (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+        showNotification('Размер файла не должен превышать 10MB', 'error');
+        return;
+    }
+    
+    isLoading = true;
+    showLoading(true);
+    
+    const formData = new FormData();
+    formData.append('chat_id', '{{ chat.id }}');
+    formData.append('file', file);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    fetch('{% url "upload_file" %}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            addMessageToChat(data.message);
+            scrollToBottom();
+            lastMessageId = data.message.id;
+            document.getElementById('fileInput').value = '';
+        } else {
+            showNotification(data.message, 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('Произошла ошибка при загрузке файла', 'error');
+    })
+    .finally(() => {
+        isLoading = false;
+        showLoading(false);
+    });
+}
+
+// Добавление сообщения в чат
+function addMessageToChat(messageData) {
+    const chatMessages = document.getElementById('chatMessages');
+    const isOwnMessage = messageData.sender_id === {{ user.id }};
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isOwnMessage ? 'own' : ''}`;
+    messageDiv.setAttribute('data-message-id', messageData.id);
+    
+    let messageContent = '';
+    if (messageData.message_type === 'text') {
+        messageContent = `<div class="message-bubble">${messageData.content.replace(/\n/g, '<br>')}</div>`;
+    } else if (messageData.message_type === 'image') {
+        messageContent = `
+            <div class="image-message">
+                <img src="${messageData.file_url}" alt="${messageData.file_name}" onclick="openImageModal(this.src)">
+            </div>
+        `;
+    } else {
+        messageContent = `
+            <div class="message-bubble">
+                <div class="file-message">
+                    <div class="file-icon document">
+                        <i class="bi bi-file-earmark"></i>
+                    </div>
+                    <div class="file-info">
+                        <h4>${messageData.file_name}</h4>
+                        <p>${messageData.file_size} • <a href="${messageData.file_url}" download>Скачать</a></p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">
+            ${messageData.sender_name.charAt(0).toUpperCase()}
+        </div>
+        <div class="message-content">
+            ${messageContent}
+            <div class="message-time">
+                ${messageData.created_at}
+            </div>
+        </div>
+    `;
+    
+    chatMessages.appendChild(messageDiv);
+}
+
+// Загрузка новых сообщений
+function loadNewMessages() {
+    if (isLoading) return;
+    
+    fetch(`{% url "get_messages" chat.id %}?last_message_id=${lastMessageId}`)
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.messages.length > 0) {
+            data.messages.forEach(message => {
+                addMessageToChat(message);
+                lastMessageId = Math.max(lastMessageId, message.id);
+            });
+            scrollToBottom();
+        }
+    })
+    .catch(error => {
+        console.error('Error loading messages:', error);
+    });
+}
+
+// Прокрутка к последнему сообщению
+function scrollToBottom() {
+    const chatMessages = document.getElementById('chatMessages');
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+// Показать/скрыть индикатор загрузки
+function showLoading(show) {
+    const indicator = document.getElementById('loadingIndicator');
+    indicator.classList.toggle('show', show);
+}
+
+// Открытие изображения в модальном окне
+function openImageModal(src) {
+    document.getElementById('modalImage').src = src;
+    new bootstrap.Modal(document.getElementById('imageModal')).show();
+}
+
+// Показать уведомление
+function showNotification(message, type) {
+    // Используем существующую функцию из других страниц
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 4000);
+}
+</script>
+{% endblock %}

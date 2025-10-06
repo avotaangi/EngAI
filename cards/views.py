@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods, require_POST
 from django.views.decorators.csrf import csrf_exempt
 from .models import Folder, Module, Card, LearningProgress, BubbleGameRecord, BalloonGameRecord
+from users.models import AIChat, AIMessage
 import json
 import logging
 from django.contrib import messages
@@ -1401,33 +1402,12 @@ ENG: [естественный перевод на английском]
 
 @login_required
 def talk_ai(request):
-    agents = [
-        {
-            'id': 'agent_polina',
-            'name': 'Polina',
-            'role': 'Разговорный английский',
-            'animation': 'https://assets10.lottiefiles.com/packages/lf20_kxsd2ytq.json'
-        },
-        {
-            'id': 'agent_alex',
-            'name': 'Alex',
-            'role': 'Деловые переговоры',
-            'animation': 'https://assets4.lottiefiles.com/packages/lf20_3vbOcw.json'
-        },
-        {
-            'id': 'agent_sophia',
-            'name': 'Sophia',
-            'role': 'Подготовка к IELTS',
-            'animation': 'https://assets4.lottiefiles.com/private_files/lf30_3sc8ow.json'
-        },
-        {
-            'id': 'agent_mike',
-            'name': 'Mike',
-            'role': 'Политическая лексика',
-            'animation': 'https://assets9.lottiefiles.com/private_files/lf30_jo2n7vqx.json'
-        },
-    ]
-    return render(request, 'cards/talk_ai.html', { 'agents': agents })
+    # Новый интерфейс не требует выбора агентов - используется универсальный AI помощник
+    context = {
+        'page_title': 'AI Conversation Practice',
+        'user': request.user,
+    }
+    return render(request, 'cards/talk_ai.html', context)
 
 
 @login_required
@@ -1439,26 +1419,155 @@ def api_chat_ai(request):
         if not user_message:
             return JsonResponse({'error': 'Пустое сообщение'}, status=400)
 
+        # Получаем или создаем активный AI чат для пользователя
+        ai_chat = AIChat.objects.filter(user=request.user, is_active=True).first()
+        if not ai_chat:
+            ai_chat = AIChat.objects.create(
+                user=request.user,
+                title=f"English Practice - {time.strftime('%Y-%m-%d %H:%M')}"
+            )
+        
+        # Сохраняем сообщение пользователя
+        user_msg = AIMessage.objects.create(
+            ai_chat=ai_chat,
+            sender_type='user',
+            content=user_message
+        )
+
         api_key = os.getenv('MISTRAL_API_KEY')
         if not api_key:
             return JsonResponse({'error': 'AI не настроен'}, status=500)
 
+        # Обновлённый промпт с современным сленгом
+        modern_prompt = """
+You are a cool, friendly AI English tutor who talks like a real person. Use modern slang, contractions, and casual language. 
+Be encouraging and fun! You can use expressions like "that's fire!", "no cap", "you're killing it", "bet", "lowkey/highkey", "vibe", etc. 
+Keep it natural and conversational - imagine you're texting with a friend who's learning English. 
+Help them practice English in a chill, supportive way. Don't be too formal or robotic.
+
+Respond in English and keep your messages relatively short and engaging.
+"""
+        
+        start_time = time.time()
         client = MistralClient(api_key=api_key)
         chat_messages = [
-            ChatMessage(role="system", content=(
-                "Ты дружелюбный собеседник-репетитор английского языка. Отвечай кратко, ясно, по делу. "
-                "Если просят озвучить, сформулируй текст, а озвучку выполнит TTS на клиенте."
-            )),
+            ChatMessage(role="system", content=modern_prompt),
             ChatMessage(role="user", content=user_message)
         ]
-        resp = client.chat(model="mistral-small", messages=chat_messages, temperature=0.7)
-        reply = resp.choices[0].message.content if getattr(resp, 'choices', None) else "Извините, не понял вопрос."
-        return JsonResponse({'reply': reply})
+        resp = client.chat(model="mistral-small", messages=chat_messages, temperature=0.8)
+        reply = resp.choices[0].message.content if getattr(resp, 'choices', None) else "Hey! Something went wrong on my end, but let's keep practicing! Try saying something else! 😅"
+        response_time = int((time.time() - start_time) * 1000)
+        
+        # Сохраняем ответ ИИ
+        ai_msg = AIMessage.objects.create(
+            ai_chat=ai_chat,
+            sender_type='ai',
+            content=reply,
+            ai_model='mistral-small',
+            ai_prompt_used=modern_prompt,
+            response_time_ms=response_time
+        )
+        
+        return JsonResponse({
+            'reply': reply,
+            'chat_id': ai_chat.id,
+            'message_id': ai_msg.id
+        })
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Неверный формат JSON'}, status=400)
     except Exception as e:
         logger.error(f"Ошибка api_chat_ai: {e}")
         return JsonResponse({'error': 'Серверная ошибка'}, status=500)
+
+
+@login_required
+@require_POST
+def api_translate_message(request):
+    """
+    API для перевода сообщений через Google Translate
+    """
+    try:
+        # Проверяем доступность googletrans
+        try:
+            from googletrans import Translator
+            TRANSLATION_AVAILABLE = True
+        except ImportError:
+            TRANSLATION_AVAILABLE = False
+        
+        data = json.loads(request.body.decode('utf-8'))
+        message = (data.get('message') or '').strip()
+        target_language = data.get('target_language', 'ru')
+        
+        if not message:
+            return JsonResponse({'error': 'Пустое сообщение'}, status=400)
+        
+        if not TRANSLATION_AVAILABLE:
+            return JsonResponse({
+                'original': message,
+                'translated': '[Перевод недоступен - не установлен googletrans]',
+                'source_language': 'unknown',
+                'target_language': target_language,
+                'status': 'warning'
+            })
+        
+        translator = Translator()
+        detection = translator.detect(message)
+        source_lang = detection.lang
+        translation = translator.translate(message, src=source_lang, dest=target_language)
+        
+        return JsonResponse({
+            'original': message,
+            'translated': translation.text,
+            'source_language': source_lang,
+            'target_language': target_language,
+            'status': 'success'
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Неверный формат JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Ошибка перевода: {e}")
+        return JsonResponse({'error': 'Ошибка перевода'}, status=500)
+
+
+@login_required
+@require_POST
+def api_clear_ai_chat(request):
+    """
+    API для очистки истории AI чата
+    """
+    try:
+        # Находим активный AI чат пользователя
+        ai_chat = AIChat.objects.filter(user=request.user, is_active=True).first()
+        
+        if ai_chat:
+            # Удаляем все сообщения в чате
+            ai_chat.ai_messages.all().delete()
+            
+            # Делаем чат неактивным и создаем новый
+            ai_chat.is_active = False
+            ai_chat.save()
+            
+            # Создаем новый чат
+            new_chat = AIChat.objects.create(
+                user=request.user,
+                title=f"New English Practice - {time.strftime('%Y-%m-%d %H:%M')}"
+            )
+            
+            return JsonResponse({
+                'message': 'Chat cleared successfully',
+                'status': 'success',
+                'new_chat_id': new_chat.id
+            })
+        else:
+            return JsonResponse({
+                'message': 'No active chat found',
+                'status': 'success'
+            })
+        
+    except Exception as e:
+        logger.error(f"Ошибка очистки чата: {e}")
+        return JsonResponse({'error': 'Ошибка очистки чата'}, status=500)
 
 
 @login_required

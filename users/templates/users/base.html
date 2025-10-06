@@ -36,29 +36,29 @@
     <!-- Левая панель -->
     <div class="sidebar" id="sidebar">
         <div class="profile-header">
-            <div class="avatar-container">
+            <div class="avatar-container" onclick="window.location.href='{% url 'profile' %}'" style="cursor: pointer;">
                 <img src="{% static 'users/img/bulldog.png' %}" alt="Аватар" class="avatar">
-                <div class="profile-actions">
-                    <button class="icon-btn friends">
+                <div class="profile-actions" onclick="event.stopPropagation();">
+                    <button class="icon-btn friends" onclick="window.location.href='{% url 'friends' %}'" title="Друзья">
                         <i class="bi bi-people"></i>
                     </button>
-                    <button class="icon-btn message">
+                    <button class="icon-btn message" onclick="window.location.href='{% url 'messages' %}'" title="Сообщения">
                         <i class="bi bi-chat"></i>
                     </button>
-                    <button class="icon-btn notification-user" onclick="window.location.href='{% url 'notifications_page' %}'">
+                    <button class="icon-btn notification-user" onclick="window.location.href='{% url 'notifications_page' %}'" title="Уведомления">
                         <i class="bi bi-bell"></i>
                         <span class="notification-badge" id="notificationBadge">0</span>
                     </button>
                 </div>
             </div>
             <div class="profile-info">
-                <h2 class="user-name">{{ user.get_full_name|default:user.username }}</h2>
+                <h2 class="user-name" onclick="window.location.href='{% url 'profile' %}'" style="cursor: pointer; transition: color 0.2s ease;" onmouseover="this.style.color='#f0f0f0'" onmouseout="this.style.color='white'">{{ user.get_full_name|default:user.username }}</h2>
                 <div class="account-dropdown">
                     <button class="account-btn" onclick="toggleDropdown(event)">
                         <span>Аккаунт</span> <i class="bi bi-chevron-down"></i>
                     </button>
                     <div class="dropdown-content" id="accountDropdown">
-                        <a href="#"><i class="bi bi-pencil"></i>Редактировать</a>
+                        <a href="{% url 'profile' %}"><i class="bi bi-person-circle"></i>Профиль</a>
                         <a href="#"><i class="bi bi-life-preserver"></i>Поддержка</a>
                         <a href="{% url 'logout' %}"><i class="bi bi-box-arrow-right"></i>Выйти</a>
                     </div>

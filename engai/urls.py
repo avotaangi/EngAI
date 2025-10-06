@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from . import views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,4 +30,10 @@ urlpatterns = [
     path('modules/', include('study_modules.urls')),
     path('social-auth/', include('social_django.urls', namespace='social')),
     path('text-check/', include('text_check.urls')),
+    # Для тестирования страницы 404 в режиме DEBUG=True
+    path('404-test/', views.page_not_found_view, name='404_test'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+# Кастомные обработчики ошибок
+handler404 = 'engai.views.custom_404_view'
+handler500 = 'engai.views.custom_500_view'

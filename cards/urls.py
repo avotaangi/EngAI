@@ -47,6 +47,8 @@ urlpatterns = [
     path('api/cards/<int:card_id>/update/', views.update_card, name='update_card'),
     path('api/cards/<int:card_id>/delete/', views.delete_card, name='delete_card'),
     path('api/chat-ai/', views.api_chat_ai, name='api_chat_ai'),
+    path('api/translate/', views.api_translate_message, name='api_translate_message'),
+    path('api/clear-chat/', views.api_clear_ai_chat, name='api_clear_ai_chat'),
     path('api/tts/', views.api_tts, name='api_tts'),
     path('api/asr/', views.api_asr, name='api_asr'),
     

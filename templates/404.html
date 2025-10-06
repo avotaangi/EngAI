@@ -1,0 +1,359 @@
+{% extends 'base.html' %}
+
+{% block title %}Страница не найдена - EngAI{% endblock %}
+
+{% block extra_css %}
+<style>
+body {
+    background: linear-gradient(135deg, #f8f5ff 0%, #e6d9ff 100%);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0;
+}
+
+.error-404-container {
+    max-width: 600px;
+    text-align: center;
+    padding: 40px 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(124, 77, 255, 0.1);
+    backdrop-filter: blur(10px);
+    animation: fadeInUp 0.8s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.error-icon {
+    font-size: 120px;
+    color: #7c4dff;
+    margin-bottom: 20px;
+    animation: bounce 2s infinite;
+}
+
+@keyframes bounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(-10px);
+    }
+    60% {
+        transform: translateY(-5px);
+    }
+}
+
+.error-title {
+    font-size: 3rem;
+    color: #7c4dff;
+    font-weight: 700;
+    margin-bottom: 10px;
+    background: linear-gradient(135deg, #7c4dff, #9c27b0);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.error-subtitle {
+    font-size: 1.5rem;
+    color: #666;
+    margin-bottom: 30px;
+    font-weight: 300;
+}
+
+.error-message {
+    font-size: 1.1rem;
+    color: #777;
+    margin-bottom: 40px;
+    line-height: 1.6;
+}
+
+.error-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.btn {
+    padding: 14px 28px;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #7c4dff, #6a3edb);
+    color: white;
+    box-shadow: 0 8px 25px rgba(124, 77, 255, 0.3);
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(124, 77, 255, 0.4);
+}
+
+.btn-secondary {
+    background: rgba(124, 77, 255, 0.1);
+    color: #7c4dff;
+    border: 2px solid #7c4dff;
+}
+
+.btn-secondary:hover {
+    background: #7c4dff;
+    color: white;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(124, 77, 255, 0.3);
+}
+
+.floating-shapes {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.shape {
+    position: absolute;
+    background: rgba(124, 77, 255, 0.1);
+    border-radius: 50%;
+    animation: float 6s ease-in-out infinite;
+}
+
+.shape:nth-child(1) {
+    width: 80px;
+    height: 80px;
+    top: 20%;
+    left: 10%;
+    animation-delay: 0s;
+}
+
+.shape:nth-child(2) {
+    width: 120px;
+    height: 120px;
+    top: 60%;
+    right: 15%;
+    animation-delay: 2s;
+}
+
+.shape:nth-child(3) {
+    width: 60px;
+    height: 60px;
+    top: 80%;
+    left: 20%;
+    animation-delay: 4s;
+}
+
+.shape:nth-child(4) {
+    width: 100px;
+    height: 100px;
+    top: 10%;
+    right: 30%;
+    animation-delay: 1s;
+}
+
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+.features-hint {
+    margin-top: 40px;
+    padding: 20px;
+    background: rgba(124, 77, 255, 0.05);
+    border-radius: 12px;
+    border-left: 4px solid #7c4dff;
+}
+
+.features-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 20px;
+    text-align: left;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+.feature-icon {
+    color: #7c4dff;
+    font-size: 1.2rem;
+}
+
+@media (max-width: 768px) {
+    .error-404-container {
+        margin: 20px;
+        padding: 30px 15px;
+    }
+    
+    .error-title {
+        font-size: 2.5rem;
+    }
+    
+    .error-subtitle {
+        font-size: 1.3rem;
+    }
+    
+    .error-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .btn {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+    }
+    
+    .features-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+.sparkle {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: #7c4dff;
+    border-radius: 50%;
+    opacity: 0;
+    animation: sparkle 3s linear infinite;
+}
+
+@keyframes sparkle {
+    0% {
+        opacity: 0;
+        transform: scale(0);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0);
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="floating-shapes">
+    <div class="shape"></div>
+    <div class="shape"></div>
+    <div class="shape"></div>
+    <div class="shape"></div>
+</div>
+
+<div class="error-404-container">
+    <div class="error-icon">🔍</div>
+    
+    <h1 class="error-title">404</h1>
+    <h2 class="error-subtitle">Страница не найдена</h2>
+    
+    <div class="error-message">
+        <p>К сожалению, страница, которую вы ищете, не существует или была перемещена.</p>
+        <p>Но не расстраивайтесь! В EngAI есть множество интересного контента для изучения английского языка.</p>
+    </div>
+    
+    <div class="error-actions">
+        <a href="/" class="btn btn-primary">
+            🏠 Вернуться на главную
+        </a>
+        <a href="javascript:history.back()" class="btn btn-secondary">
+            ⬅️ Назад
+        </a>
+    </div>
+    
+    <div class="features-hint">
+        <h3 style="color: #7c4dff; margin-bottom: 15px; font-size: 1.2rem;">
+            🚀 Что вы можете делать в EngAI:
+        </h3>
+        <div class="features-list">
+            <div class="feature-item">
+                <span class="feature-icon">📚</span>
+                <span>Изучать карточки со словами</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🤖</span>
+                <span>Тренироваться с AI</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📖</span>
+                <span>Читать модули</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">✍️</span>
+                <span>Проверять тексты</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">📝</span>
+                <span>Вести словарь</span>
+            </div>
+            <div class="feature-item">
+                <span class="feature-icon">🎯</span>
+                <span>Отслеживать прогресс</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Добавление искр для анимации
+function createSparkle() {
+    const sparkle = document.createElement('div');
+    sparkle.className = 'sparkle';
+    sparkle.style.left = Math.random() * 100 + '%';
+    sparkle.style.top = Math.random() * 100 + '%';
+    sparkle.style.animationDelay = Math.random() * 3 + 's';
+    document.body.appendChild(sparkle);
+    
+    setTimeout(() => {
+        document.body.removeChild(sparkle);
+    }, 3000);
+}
+
+// Создание искр каждые 2 секунды
+setInterval(createSparkle, 2000);
+
+// Создание начальных искр
+for (let i = 0; i < 5; i++) {
+    setTimeout(() => createSparkle(), i * 400);
+}
+</script>
+{% endblock %}

@@ -1,0 +1,433 @@
+{% extends 'users/base.html' %}
+{% load static %}
+
+{% block extra_css %}
+<style>
+    .messages-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #ffffff;
+        border-radius: 20px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .messages-header {
+        text-align: center;
+        margin-bottom: 40px;
+        padding: 30px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        color: white;
+    }
+
+    .messages-header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+        font-weight: 600;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .messages-header p {
+        font-size: 1.1rem;
+        opacity: 0.9;
+        margin: 0;
+    }
+
+    /* Поиск */
+    .search-section {
+        margin-bottom: 30px;
+    }
+
+    .search-form {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .search-input {
+        flex: 1;
+        padding: 14px 20px;
+        border: 2px solid #e2e8f0;
+        border-radius: 25px;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        padding-left: 50px;
+        background: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTExIDJDMTUuNDE0MiAyIDIwIDYuNTg1NzkgMjAgMTFDMjAgMTUuNDE0MiAxNS40MTQyIDIwIDExIDIwQzYuNTg1NzkgMjAgMiAxNS40MTQyIDIgMTFDMiA2LjU4NTc5IDYuNTg1NzkgMiAxMSAyWiIgc3Ryb2tlPSIjOWZhNmI1IiBzdHJva2Utd2lkdGg9IjIiLz4KPHBhdGggZD0ibTIxIDIxLTQuMzUtNC4zNSIgc3Ryb2tlPSIjOWZhNmI1IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K') no-repeat 15px center;
+        background-size: 20px;
+    }
+
+    .search-input:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        background-color: #ffffff;
+    }
+
+    /* Список чатов */
+    .chats-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .chat-item {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        transition: all 0.3s ease;
+        cursor: pointer;
+        text-decoration: none;
+        color: inherit;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .chat-item:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 40px rgba(102, 126, 234, 0.15);
+        border-color: rgba(102, 126, 234, 0.2);
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .chat-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        transform: scaleX(0);
+        transition: transform 0.3s ease;
+    }
+
+    .chat-item:hover::before {
+        transform: scaleX(1);
+    }
+
+    .chat-content {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+
+    .chat-avatar {
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 1.5rem;
+        font-weight: bold;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        flex-shrink: 0;
+    }
+
+    .chat-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chat-user-name {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #2d3748;
+        margin: 0 0 5px 0;
+    }
+
+    .chat-last-message {
+        color: #6b7280;
+        font-size: 0.95rem;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        line-height: 1.4;
+    }
+
+    .chat-meta {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 5px;
+        flex-shrink: 0;
+    }
+
+    .chat-time {
+        font-size: 0.85rem;
+        color: #9ca3af;
+        white-space: nowrap;
+    }
+
+    .unread-badge {
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        border-radius: 50%;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        font-weight: bold;
+        min-width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Пустое состояние */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+        color: #6b7280;
+    }
+
+    .empty-state i {
+        font-size: 4.5rem;
+        margin-bottom: 20px;
+        opacity: 0.5;
+        color: #667eea;
+    }
+
+    .empty-state h3 {
+        font-size: 1.8rem;
+        margin-bottom: 15px;
+        color: #374151;
+        font-weight: 600;
+    }
+
+    .empty-state p {
+        font-size: 1.1rem;
+        max-width: 500px;
+        margin: 0 auto 30px;
+        line-height: 1.6;
+    }
+
+    .start-chat-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .start-chat-btn:hover {
+        color: white;
+        text-decoration: none;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.3);
+    }
+
+    /* Адаптивность */
+    @media (max-width: 768px) {
+        .messages-container {
+            margin: 10px;
+            padding: 15px;
+        }
+
+        .messages-header {
+            padding: 20px 15px;
+        }
+
+        .messages-header h1 {
+            font-size: 2rem;
+        }
+
+        .search-form {
+            flex-direction: column;
+        }
+
+        .chat-content {
+            gap: 12px;
+        }
+
+        .chat-avatar {
+            width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+        }
+
+        .chat-user-name {
+            font-size: 1.1rem;
+        }
+
+        .chat-last-message {
+            font-size: 0.9rem;
+        }
+
+        .chat-meta {
+            align-items: flex-start;
+        }
+
+        .empty-state {
+            padding: 50px 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+        }
+
+        .empty-state p {
+            font-size: 1rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="messages-container">
+    <!-- Заголовок -->
+    <div class="messages-header">
+        <h1>
+            <i class="bi bi-chat-dots"></i>
+            Сообщения
+        </h1>
+        <p>Общайтесь с друзьями и делитесь файлами</p>
+    </div>
+
+    <!-- Поиск -->
+    <div class="search-section">
+        <form class="search-form" method="GET">
+            <input type="text" class="search-input" name="q" 
+                   placeholder="Поиск по имени пользователя..." 
+                   value="{{ search_query|default:'' }}">
+        </form>
+    </div>
+
+    <!-- Список чатов -->
+    {% if chats_data %}
+        <div class="chats-list">
+            {% for chat_data in chats_data %}
+                <a href="{% url 'chat' chat_data.other_user.id %}" class="chat-item">
+                    <div class="chat-content">
+                        <div class="chat-avatar">
+                            {{ chat_data.other_user.get_full_name.0|upper|default:chat_data.other_user.email.0|upper }}
+                        </div>
+                        <div class="chat-info">
+                            <h4 class="chat-user-name">
+                                {{ chat_data.other_user.get_full_name|default:chat_data.other_user.email }}
+                            </h4>
+                            {% if chat_data.last_message %}
+                                <p class="chat-last-message">
+                                    {% if chat_data.last_message.message_type == 'text' %}
+                                        {% if chat_data.last_message.sender == user %}
+                                            <strong>Вы:</strong>
+                                        {% else %}
+                                            <strong>{{ chat_data.last_message.sender.get_full_name|default:chat_data.last_message.sender.email }}:</strong>
+                                        {% endif %}
+                                        {{ chat_data.last_message.content|truncatechars:60 }}
+                                    {% elif chat_data.last_message.message_type == 'image' %}
+                                        <i class="bi bi-image"></i>
+                                        {% if chat_data.last_message.sender == user %}Вы{% else %}{{ chat_data.last_message.sender.get_full_name|default:chat_data.last_message.sender.email }}{% endif %} отправил(а) изображение
+                                    {% else %}
+                                        <i class="bi bi-paperclip"></i>
+                                        {% if chat_data.last_message.sender == user %}Вы{% else %}{{ chat_data.last_message.sender.get_full_name|default:chat_data.last_message.sender.email }}{% endif %} отправил(а) файл
+                                    {% endif %}
+                                </p>
+                            {% else %}
+                                <p class="chat-last-message">Нет сообщений</p>
+                            {% endif %}
+                        </div>
+                        <div class="chat-meta">
+                            {% if chat_data.last_message %}
+                                <span class="chat-time">
+                                    {{ chat_data.last_message.created_at|date:"d.m.Y H:i" }}
+                                </span>
+                            {% endif %}
+                            {% if chat_data.unread_count > 0 %}
+                                <span class="unread-badge">{{ chat_data.unread_count }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state">
+            {% if search_query %}
+                <i class="bi bi-search"></i>
+                <h3>Ничего не найдено</h3>
+                <p>
+                    По запросу "{{ search_query }}" чаты не найдены.<br>
+                    Попробуйте изменить поисковый запрос.
+                </p>
+            {% else %}
+                <i class="bi bi-chat-dots"></i>
+                <h3>У вас пока нет сообщений</h3>
+                <p>
+                    Начните общение с друзьями! Найдите интересных людей 
+                    в разделе друзей и отправьте им первое сообщение.
+                </p>
+                <a href="{% url 'friends' %}" class="start-chat-btn">
+                    <i class="bi bi-people"></i>
+                    Найти друзей
+                </a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Автоматический поиск при вводе
+    const searchInput = document.querySelector('.search-input');
+    let searchTimeout;
+    
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            this.form.submit();
+        }, 500);
+    });
+    
+    // Обновление времени относительно текущего
+    function updateTimes() {
+        const timeElements = document.querySelectorAll('.chat-time');
+        timeElements.forEach(element => {
+            const timestamp = element.getAttribute('data-timestamp');
+            if (timestamp) {
+                element.textContent = formatRelativeTime(new Date(timestamp));
+            }
+        });
+    }
+    
+    function formatRelativeTime(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) {
+            return 'только что';
+        } else if (diffMins < 60) {
+            return `${diffMins} мин назад`;
+        } else if (diffHours < 24) {
+            return `${diffHours} ч назад`;
+        } else if (diffDays < 7) {
+            return `${diffDays} д назад`;
+        } else {
+            return date.toLocaleDateString();
+        }
+    }
+    
+    // Обновляем время каждую минуту
+    setInterval(updateTimes, 60000);
+});
+</script>
+{% endblock %}

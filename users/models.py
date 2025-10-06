@@ -81,3 +81,269 @@ class UserLog(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.get_action_display()} - {self.timestamp}"
+
+
+class Friendship(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Ожидает подтверждения'),
+        ('accepted', 'Принято'),
+        ('declined', 'Отклонено'),
+    ]
+    
+    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_friend_requests')
+    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='received_friend_requests')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('from_user', 'to_user')
+        verbose_name = 'Дружба'
+        verbose_name_plural = 'Дружбы'
+    
+    def __str__(self):
+        return f"{self.from_user.get_full_name()} -> {self.to_user.get_full_name()} ({self.get_status_display()})"
+    
+    @classmethod
+    def are_friends(cls, user1, user2):
+        """Проверяет, являются ли пользователи друзьями"""
+        return cls.objects.filter(
+            models.Q(from_user=user1, to_user=user2) | models.Q(from_user=user2, to_user=user1),
+            status='accepted'
+        ).exists()
+    
+    @classmethod
+    def get_friends(cls, user):
+        """Получает всех друзей пользователя"""
+        friends_from = cls.objects.filter(from_user=user, status='accepted').values_list('to_user', flat=True)
+        friends_to = cls.objects.filter(to_user=user, status='accepted').values_list('from_user', flat=True)
+        friend_ids = list(friends_from) + list(friends_to)
+        return User.objects.filter(id__in=friend_ids)
+    
+    @classmethod
+    def get_pending_requests(cls, user):
+        """Получает заявки в друзья для пользователя"""
+        return cls.objects.filter(to_user=user, status='pending')
+    
+    @classmethod 
+    def send_friend_request(cls, from_user, to_user):
+        """Отправляет заявку в друзья"""
+        if from_user == to_user:
+            return None, 'Нельзя отправить заявку самому себе'
+        
+        if cls.are_friends(from_user, to_user):
+            return None, 'Вы уже друзья'
+        
+        existing = cls.objects.filter(
+            models.Q(from_user=from_user, to_user=to_user) | 
+            models.Q(from_user=to_user, to_user=from_user)
+        ).first()
+        
+        if existing:
+            if existing.status == 'pending':
+                return None, 'Заявка уже отправлена'
+            elif existing.status == 'declined':
+                existing.status = 'pending'
+                existing.from_user = from_user
+                existing.to_user = to_user
+                existing.save()
+                return existing, 'Заявка отправлена повторно'
+        
+        friendship = cls.objects.create(from_user=from_user, to_user=to_user)
+        return friendship, 'Заявка в друзья отправлена'
+
+
+class Chat(models.Model):
+    """Модель для чата между двумя пользователями"""
+    user1 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chats_as_user1')
+    user2 = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chats_as_user2')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['user1', 'user2']
+        ordering = ['-updated_at']
+        verbose_name = 'Чат'
+        verbose_name_plural = 'Чаты'
+    
+    @classmethod
+    def get_or_create_chat(cls, user1, user2):
+        """Получить или создать чат между двумя пользователями"""
+        # Упорядочиваем пользователей по ID, чтобы избежать дубликатов
+        if user1.id > user2.id:
+            user1, user2 = user2, user1
+        
+        chat, created = cls.objects.get_or_create(user1=user1, user2=user2)
+        return chat
+    
+    def get_other_user(self, current_user):
+        """Получить другого участника чата"""
+        return self.user2 if self.user1 == current_user else self.user1
+    
+    def get_last_message(self):
+        """Получить последнее сообщение"""
+        return self.messages.order_by('-created_at').first()
+    
+    def get_unread_count(self, user):
+        """Получить количество непрочитанных сообщений"""
+        return self.messages.filter(
+            is_read=False
+        ).exclude(sender=user).count()
+    
+    def __str__(self):
+        return f"Chat: {self.user1.get_full_name() or self.user1.email} - {self.user2.get_full_name() or self.user2.email}"
+
+
+def chat_file_upload_path(instance, filename):
+    """Путь для сохранения файлов чата"""
+    import os
+    import uuid
+    from django.utils import timezone
+    
+    # Получаем расширение файла
+    ext = os.path.splitext(filename)[1].lower()
+    # Генерируем уникальное имя
+    unique_filename = f"{uuid.uuid4()}{ext}"
+    # Организуем по годам и месяцам
+    date_path = timezone.now().strftime('%Y/%m')
+    
+    return f'chat_files/{date_path}/{unique_filename}'
+
+
+class Message(models.Model):
+    """Модель для сообщения в чате"""
+    MESSAGE_TYPES = [
+        ('text', 'Текст'),
+        ('image', 'Изображение'),
+        ('file', 'Файл'),
+    ]
+    
+    chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages')
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name='sent_messages')
+    message_type = models.CharField(max_length=10, choices=MESSAGE_TYPES, default='text')
+    content = models.TextField(blank=True, null=True)  # Для текстовых сообщений
+    file = models.FileField(upload_to=chat_file_upload_path, blank=True, null=True)  # Для файлов
+    file_name = models.CharField(max_length=255, blank=True, null=True)  # Оригинальное имя файла
+    file_size = models.PositiveIntegerField(blank=True, null=True)  # Размер файла в байтах
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Сообщение'
+        verbose_name_plural = 'Сообщения'
+    
+    @property
+    def is_image(self):
+        """Проверяет, является ли файл изображением"""
+        if self.file:
+            import os
+            ext = os.path.splitext(self.file.name)[1].lower()
+            return ext in ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']
+        return False
+    
+    @property
+    def file_size_human(self):
+        """Возвращает размер файла в читаемом виде"""
+        if not self.file_size:
+            return ''
+        
+        size = self.file_size
+        for unit in ['B', 'KB', 'MB', 'GB']:
+            if size < 1024.0:
+                return f"{size:.1f} {unit}"
+            size /= 1024.0
+        return f"{size:.1f} TB"
+    
+    def save(self, *args, **kwargs):
+        # Обновляем время последнего обновления чата
+        if self.pk is None:  # Новое сообщение
+            self.chat.updated_at = timezone.now()
+            self.chat.save(update_fields=['updated_at'])
+        
+        # Сохраняем информацию о файле
+        if self.file:
+            if hasattr(self.file, 'name'):
+                self.file_name = self.file.name.split('/')[-1] if '/' in self.file.name else self.file.name
+            if hasattr(self.file, 'size'):
+                self.file_size = self.file.size
+            
+            # Определяем тип сообщения
+            if self.is_image:
+                self.message_type = 'image'
+            else:
+                self.message_type = 'file'
+        
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        if self.message_type == 'text':
+            content_preview = (self.content[:50] + '...') if len(self.content) > 50 else self.content
+            return f"{self.sender.get_full_name() or self.sender.email}: {content_preview}"
+        else:
+            return f"{self.sender.get_full_name() or self.sender.email}: [{self.message_type.upper()}] {self.file_name}"
+
+
+class AIChat(models.Model):
+    """Модель для чата с ИИ для изучения английского языка"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='ai_chats')
+    title = models.CharField('Название чата', max_length=200, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField('Активный', default=True)
+    
+    class Meta:
+        ordering = ['-updated_at']
+        verbose_name = 'AI Чат'
+        verbose_name_plural = 'AI Чаты'
+    
+    def get_last_message(self):
+        """Получить последнее сообщение"""
+        return self.ai_messages.order_by('-created_at').first()
+    
+    def get_messages_count(self):
+        """Получить количество сообщений в чате"""
+        return self.ai_messages.count()
+    
+    def __str__(self):
+        title = self.title or f"AI Chat {self.id}"
+        return f"{self.user.get_full_name() or self.user.email} - {title}"
+
+
+class AIMessage(models.Model):
+    """Модель для сообщения в AI чате"""
+    SENDER_CHOICES = [
+        ('user', 'Пользователь'),
+        ('ai', 'ИИ'),
+    ]
+    
+    ai_chat = models.ForeignKey(AIChat, on_delete=models.CASCADE, related_name='ai_messages')
+    sender_type = models.CharField('Отправитель', max_length=10, choices=SENDER_CHOICES)
+    content = models.TextField('Содержимое сообщения')
+    original_language = models.CharField('Исходный язык', max_length=10, blank=True, null=True)
+    translated_content = models.TextField('Переведенное содержимое', blank=True, null=True)
+    translation_language = models.CharField('Язык перевода', max_length=10, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    # Метаданные для ИИ
+    ai_model = models.CharField('Модель ИИ', max_length=100, blank=True, null=True)
+    ai_prompt_used = models.TextField('Использованный промпт', blank=True, null=True)
+    response_time_ms = models.PositiveIntegerField('Время ответа (мс)', blank=True, null=True)
+    
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'AI Сообщение'
+        verbose_name_plural = 'AI Сообщения'
+    
+    def save(self, *args, **kwargs):
+        # Обновляем время последнего обновления чата
+        if self.pk is None:  # Новое сообщение
+            self.ai_chat.updated_at = timezone.now()
+            self.ai_chat.save(update_fields=['updated_at'])
+        
+        super().save(*args, **kwargs)
+    
+    def __str__(self):
+        content_preview = (self.content[:100] + '...') if len(self.content) > 100 else self.content
+        sender_display = 'ИИ' if self.sender_type == 'ai' else 'Пользователь'
+        return f"[{sender_display}]: {content_preview}"

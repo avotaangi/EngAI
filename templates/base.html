@@ -17,6 +17,9 @@
             font-family: 'Segoe UI', system-ui, sans-serif;
             line-height: 1.6;
             color: #333;
+            display: flex;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #f8f5ff 0%, #e6d9ff 100%);
         }
         
         .container {
@@ -25,18 +28,284 @@
             margin: 0 auto;
             padding: 0 15px;
         }
+        
+        /* Боковое меню */
+        .sidebar {
+            width: 280px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 4px 0 20px rgba(124, 77, 255, 0.1);
+            padding: 30px 0;
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+        
+        .sidebar-header {
+            padding: 0 30px 30px;
+            border-bottom: 2px solid rgba(124, 77, 255, 0.1);
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            font-size: 2rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #7c4dff, #9c27b0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+        }
+        
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .menu-item {
+            margin-bottom: 8px;
+        }
+        
+        .menu-link {
+            display: flex;
+            align-items: center;
+            padding: 16px 30px;
+            color: #666;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .menu-link:hover {
+            background: rgba(124, 77, 255, 0.1);
+            color: #7c4dff;
+            transform: translateX(5px);
+        }
+        
+        .menu-link.active {
+            background: linear-gradient(135deg, #7c4dff, #9c27b0);
+            color: white;
+        }
+        
+        .menu-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 4px;
+            background: #fff;
+        }
+        
+        .menu-icon {
+            font-size: 1.5rem;
+            margin-right: 15px;
+            min-width: 24px;
+            text-align: center;
+        }
+        
+        .menu-text {
+            font-size: 1rem;
+            font-weight: 500;
+        }
+        
+        /* Основной контент */
+        .main-wrapper {
+            flex: 1;
+            margin-left: 280px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .content-area {
+            flex: 1;
+            padding: 20px;
+        }
+        
+        /* Мобильные устройства */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                width: 100%;
+                max-width: 280px;
+            }
+            
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            
+            .main-wrapper {
+                margin-left: 0;
+            }
+            
+            .mobile-menu-toggle {
+                display: block;
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                z-index: 1001;
+                background: #7c4dff;
+                color: white;
+                border: none;
+                padding: 12px;
+                border-radius: 12px;
+                cursor: pointer;
+                box-shadow: 0 4px 20px rgba(124, 77, 255, 0.3);
+                transition: all 0.3s ease;
+            }
+            
+            .mobile-menu-toggle:hover {
+                background: #6a3edb;
+                transform: scale(1.05);
+            }
+            
+            .mobile-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+            }
+            
+            .mobile-overlay.show {
+                display: block;
+            }
+        }
+        
+        @media (min-width: 769px) {
+            .mobile-menu-toggle {
+                display: none;
+            }
+        }
+        
+        /* Анимация появления пунктов меню */
+        .menu-item {
+            opacity: 0;
+            animation: slideInLeft 0.5s ease forwards;
+        }
+        
+        .menu-item:nth-child(1) { animation-delay: 0.1s; }
+        .menu-item:nth-child(2) { animation-delay: 0.2s; }
+        .menu-item:nth-child(3) { animation-delay: 0.3s; }
+        
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
     </style>
     
     <!-- Дополнительные стили -->
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Основной контент -->
-    <main>
-        {% block content %}{% endblock %}
-    </main>
+    <!-- Кнопка мобильного меню -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle">
+        <span style="font-size: 1.2rem;">☰</span>
+    </button>
+    
+    <!-- Мобильный оверлей -->
+    <div class="mobile-overlay" id="mobileOverlay"></div>
+    
+    <!-- Боковое меню -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="logo">EngAI</a>
+        </div>
+        
+        <nav>
+            <ul class="sidebar-menu">
+                <li class="menu-item">
+                    <a href="/subscription/" class="menu-link">
+                        <span class="menu-icon">💎</span>
+                        <span class="menu-text">Моя подписка</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="/achievements/" class="menu-link">
+                        <span class="menu-icon">🏆</span>
+                        <span class="menu-text">Награды</span>
+                    </a>
+                </li>
+                <li class="menu-item">
+                    <a href="/learning-path/" class="menu-link">
+                        <span class="menu-icon">🎯</span>
+                        <span class="menu-text">Траектория обучения</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </aside>
+    
+    <!-- Основная область контента -->
+    <div class="main-wrapper">
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
 
     <!-- Дополнительные скрипты -->
     {% block extra_js %}{% endblock %}
+    
+    <!-- JavaScript для мобильного меню -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mobileToggle = document.getElementById('mobileMenuToggle');
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            
+            function toggleMobileMenu() {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('show');
+            }
+            
+            function closeMobileMenu() {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('show');
+            }
+            
+            mobileToggle?.addEventListener('click', toggleMobileMenu);
+            overlay?.addEventListener('click', closeMobileMenu);
+            
+            // Закрытие меню при клике на ссылку (мобильные устройства)
+            const menuLinks = document.querySelectorAll('.menu-link');
+            menuLinks.forEach(link => {
+                link.addEventListener('click', () => {
+                    if (window.innerWidth <= 768) {
+                        closeMobileMenu();
+                    }
+                });
+            });
+            
+            // Закрытие меню при изменении размера окна
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 768) {
+                    closeMobileMenu();
+                }
+            });
+            
+            // Отметка активной страницы в меню
+            const currentPath = window.location.pathname;
+            const menuLinks = document.querySelectorAll('.menu-link');
+            menuLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
 </body>
 </html> 
