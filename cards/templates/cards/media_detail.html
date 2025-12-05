@@ -1,0 +1,336 @@
+{% extends 'users/base.html' %}
+{% load static %}
+
+{% block title %}{% if media.title %}{{ media.title }}{% else %}{{ media.name }}{% endif %} — Просмотр{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/media_center.css' %}">
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="media-detail-page">
+    <!-- Hero секция с backdrop -->
+    <div class="media-detail-hero" style="background-image: url('{{ backdrop_url|default:poster_url }}');">
+        <div class="media-detail-hero-content">
+            <div class="media-detail-poster">
+                {% if poster_url %}
+                    <img src="{{ poster_url }}" alt="{% if media.title %}{{ media.title }}{% else %}{{ media.name }}{% endif %}">
+                {% else %}
+                    <div style="width: 100%; aspect-ratio: 2/3; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 3rem;">
+                        <i class="bi bi-film"></i>
+                    </div>
+                {% endif %}
+            </div>
+            <div class="media-detail-info">
+                <h1 class="media-detail-title">{% if media.title %}{{ media.title }}{% else %}{{ media.name }}{% endif %}</h1>
+                <div class="media-detail-meta">
+                    {% if media.vote_average %}
+                        <div class="media-detail-rating">
+                            <i class="bi bi-star-fill"></i>
+                            {{ media.vote_average|floatformat:1 }}
+                        </div>
+                    {% endif %}
+                    {% if media.release_date %}
+                        <span>{{ media.release_date|date:"Y" }}</span>
+                    {% elif media.first_air_date %}
+                        <span>{{ media.first_air_date|date:"Y" }}</span>
+                    {% endif %}
+                    {% if media.runtime %}
+                        <span>{{ media.runtime }} мин</span>
+                    {% elif media.episode_run_time %}
+                        <span>{{ media.episode_run_time.0 }} мин/серия</span>
+                    {% endif %}
+                    <div class="media-detail-genres">
+                        {% for genre in genres %}
+                            <span class="media-detail-genre">{{ genre }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% if media.overview %}
+                    <p class="media-detail-overview">{{ media.overview }}</p>
+                {% endif %}
+                <div class="media-detail-actions">
+                    {% if trailer_key %}
+                        <button class="media-detail-btn" onclick="playTrailer()">
+                            <i class="bi bi-play-fill"></i>
+                            Смотреть трейлер
+                        </button>
+                    {% endif %}
+                    <button class="media-detail-btn secondary" onclick="window.history.back()">
+                        <i class="bi bi-arrow-left"></i>
+                        Назад
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основной контент -->
+    <div class="media-detail-content">
+        <!-- Видеоплеер для просмотра -->
+        <div class="media-detail-section">
+            <div class="media-player-container">
+                <div class="media-player-header">
+                    <h2>Просмотр фильма</h2>
+                    <div class="media-player-controls">
+                        <button class="media-control-btn" id="subtitlesBtn" onclick="toggleSubtitles()">
+                            <i class="bi bi-captions"></i>
+                            <span>Субтитры</span>
+                        </button>
+                        <button class="media-control-btn primary" id="generateLexiconBtn" onclick="generateLexicon()">
+                            <i class="bi bi-magic"></i>
+                            <span>Сгенерировать лексику</span>
+                        </button>
+                    </div>
+                </div>
+                <div class="media-player-wrapper">
+                    {% if trailer_key %}
+                        <div class="media-player" id="mediaPlayer">
+                            <iframe id="playerFrame" src="https://www.youtube.com/embed/{{ trailer_key }}?enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                        </div>
+                    {% else %}
+                        <div class="media-player-placeholder">
+                            <i class="bi bi-play-circle" style="font-size: 4rem; color: #667eea;"></i>
+                            <p>Видео недоступно</p>
+                        </div>
+                    {% endif %}
+                    <div class="subtitles-container" id="subtitlesContainer" style="display: none;">
+                        <div class="subtitles-display" id="subtitlesDisplay">
+                            <p>Субтитры будут отображаться здесь</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Генерированная лексика -->
+        <div class="media-detail-section" id="lexiconSection" style="display: none;">
+            <div class="lexicon-container">
+                <div class="lexicon-header">
+                    <h2>
+                        <i class="bi bi-book"></i>
+                        Лексика фильма
+                    </h2>
+                    <button class="lexicon-close-btn" onclick="closeLexicon()">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div class="lexicon-content" id="lexiconContent">
+                    <div class="lexicon-loading">
+                        <div class="spinner"></div>
+                        <p>Генерируем лексику через ИИ...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Актеры -->
+        {% if cast %}
+            <div class="media-detail-section">
+                <h2>В главных ролях</h2>
+                <div class="media-detail-cast">
+                    {% for actor in cast %}
+                        <div class="media-detail-cast-item">
+                            <div class="media-detail-cast-image">
+                                {% if actor.profile_path %}
+                                    <img src="https://image.tmdb.org/t/p/w185{{ actor.profile_path }}" alt="{{ actor.name }}" loading="lazy">
+                                {% else %}
+                                    <div style="width: 100%; height: 100%; background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #999;">
+                                        <i class="bi bi-person" style="font-size: 2rem;"></i>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="media-detail-cast-name">{{ actor.name }}</div>
+                            {% if actor.character %}
+                                <div class="media-detail-cast-character">{{ actor.character }}</div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Дополнительная информация -->
+        <div class="media-detail-section">
+            <h2>Информация</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                {% if media.status %}
+                    <div>
+                        <strong>Статус:</strong> {{ media.status }}
+                    </div>
+                {% endif %}
+                {% if media.original_language %}
+                    <div>
+                        <strong>Язык:</strong> {{ media.original_language|upper }}
+                    </div>
+                {% endif %}
+                {% if media.production_companies %}
+                    <div>
+                        <strong>Студия:</strong> 
+                        {% for company in media.production_companies|slice:":3" %}
+                            {{ company.name }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if media.budget and media_type == 'movie' %}
+                    <div>
+                        <strong>Бюджет:</strong> ${{ media.budget|floatformat:0 }}
+                    </div>
+                {% endif %}
+                {% if media.revenue and media_type == 'movie' %}
+                    <div>
+                        <strong>Сборы:</strong> ${{ media.revenue|floatformat:0 }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let subtitlesActive = false;
+
+function toggleSubtitles() {
+    const btn = document.getElementById('subtitlesBtn');
+    const container = document.getElementById('subtitlesContainer');
+    
+    subtitlesActive = !subtitlesActive;
+    
+    if (subtitlesActive) {
+        container.style.display = 'block';
+        btn.classList.add('active');
+        btn.querySelector('span').textContent = 'Скрыть субтитры';
+    } else {
+        container.style.display = 'none';
+        btn.classList.remove('active');
+        btn.querySelector('span').textContent = 'Субтитры';
+    }
+}
+
+function generateLexicon() {
+    const section = document.getElementById('lexiconSection');
+    const content = document.getElementById('lexiconContent');
+    const btn = document.getElementById('generateLexiconBtn');
+    
+    // Показываем секцию
+    section.style.display = 'block';
+    
+    // Показываем загрузку
+    content.innerHTML = `
+        <div class="lexicon-loading">
+            <div class="spinner"></div>
+            <p>Генерируем лексику через ИИ...</p>
+        </div>
+    `;
+    
+    // Блокируем кнопку
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> <span>Генерация...</span>';
+    
+    // Отправляем запрос
+    fetch(`/cards/media/{{ media_type }}/{{ media_id }}/generate-lexicon/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value || ''
+        },
+        body: JSON.stringify({
+            title: '{% if media.title %}{{ media.title }}{% else %}{{ media.name }}{% endif %}'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            content.innerHTML = `<div class="lexicon-loading"><p style="color: #ff6b6b;">${data.error}</p></div>`;
+        } else {
+            renderLexicon(data);
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-magic"></i> <span>Сгенерировать лексику</span>';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        content.innerHTML = '<div class="lexicon-loading"><p style="color: #ff6b6b;">Ошибка при генерации лексики</p></div>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-magic"></i> <span>Сгенерировать лексику</span>';
+    });
+    
+    // Прокручиваем к секции
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderLexicon(data) {
+    let html = '';
+    
+    // Слова
+    if (data.words && data.words.length > 0) {
+        html += '<div class="lexicon-section">';
+        html += '<h3 class="lexicon-section-title"><i class="bi bi-book"></i> Слова</h3>';
+        html += '<div class="lexicon-words-grid">';
+        data.words.forEach(word => {
+            html += `
+                <div class="lexicon-item">
+                    <div class="lexicon-word">${escapeHtml(word.word)}</div>
+                    <div class="lexicon-translation">${escapeHtml(word.translation)}</div>
+                    ${word.example ? `<div class="lexicon-example">${escapeHtml(word.example)}</div>` : ''}
+                    ${word.level ? `<span class="lexicon-level">${escapeHtml(word.level)}</span>` : ''}
+                </div>
+            `;
+        });
+        html += '</div></div>';
+    }
+    
+    // Фразы
+    if (data.phrases && data.phrases.length > 0) {
+        html += '<div class="lexicon-section">';
+        html += '<h3 class="lexicon-section-title"><i class="bi bi-chat-quote"></i> Фразы</h3>';
+        html += '<div class="lexicon-phrases-grid">';
+        data.phrases.forEach(phrase => {
+            html += `
+                <div class="lexicon-item">
+                    <div class="lexicon-word">${escapeHtml(phrase.phrase)}</div>
+                    <div class="lexicon-translation">${escapeHtml(phrase.translation)}</div>
+                    ${phrase.example ? `<div class="lexicon-example">${escapeHtml(phrase.example)}</div>` : ''}
+                    ${phrase.level ? `<span class="lexicon-level">${escapeHtml(phrase.level)}</span>` : ''}
+                </div>
+            `;
+        });
+        html += '</div></div>';
+    }
+    
+    // Грамматика
+    if (data.grammar && data.grammar.length > 0) {
+        html += '<div class="lexicon-section">';
+        html += '<h3 class="lexicon-section-title"><i class="bi bi-journal-text"></i> Грамматика</h3>';
+        data.grammar.forEach(grammar => {
+            html += `
+                <div class="lexicon-grammar-item">
+                    <div class="lexicon-grammar-topic">${escapeHtml(grammar.topic)}</div>
+                    <div class="lexicon-grammar-explanation">${escapeHtml(grammar.explanation)}</div>
+                    ${grammar.example ? `<div class="lexicon-example">${escapeHtml(grammar.example)}</div>` : ''}
+                </div>
+            `;
+        });
+        html += '</div>';
+    }
+    
+    if (!html) {
+        html = '<div class="lexicon-loading"><p>Лексика не найдена</p></div>';
+    }
+    
+    document.getElementById('lexiconContent').innerHTML = html;
+}
+
+function closeLexicon() {
+    document.getElementById('lexiconSection').style.display = 'none';
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
+

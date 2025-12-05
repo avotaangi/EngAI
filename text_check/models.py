@@ -18,6 +18,7 @@ class Error(models.Model):
     position = models.IntegerField()  # Позиция ошибки в тексте
 
 class Theme(models.Model):
+    text_check = models.ForeignKey(TextCheck, on_delete=models.CASCADE, related_name='themes', null=True, blank=True)
     name = models.CharField(max_length=100)
     description = models.TextField()
-    errors = models.ManyToManyField(Error, related_name='themes')
+    errors = models.ManyToManyField(Error, related_name='themes', blank=True)

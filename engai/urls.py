@@ -25,6 +25,9 @@ urlpatterns = [
     path('api/', include('notifications.api_urls')),  # API endpoints
     path('notifications/', include('notifications.urls')),  # Страница уведомлений
     path('dashboard/', views.dashboard_view, name='dashboard'),  # Главная страница dashboard
+    path('level-test/', views.level_test_view, name='level_test'),  # Страница теста уровня языка
+    path('api/level-test/start/', views.start_level_test, name='start_level_test'),  # Начать тест уровня
+    path('api/level-test/submit/', views.submit_level_test, name='submit_level_test'),  # Отправить ответы
     path('', include('users.urls')),
     path('dictionary/', include('dictionary.urls')),
     path('cards/', include('cards.urls')),

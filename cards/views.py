@@ -62,6 +62,157 @@ def ai_speak(request):
 def media_center(request):
     return render(request, 'cards/media_center.html')
 
+@login_required
+def media_detail(request, media_type, media_id):
+    """
+    Страница просмотра фильма/сериала с детальной информацией
+    """
+    tmdb_api_key = os.getenv('TMDB_API_KEY', '')
+    if not tmdb_api_key:
+        tmdb_api_key = '1f54bd990f1cdfb230adb312546d765d'
+    
+    base_url = 'https://api.themoviedb.org/3'
+    headers = {'accept': 'application/json'}
+    
+    try:
+        if media_type == 'movie':
+            url = f'{base_url}/movie/{media_id}'
+            params = {'api_key': tmdb_api_key, 'language': 'en-US', 'append_to_response': 'videos,credits'}
+        else:  # tv
+            url = f'{base_url}/tv/{media_id}'
+            params = {'api_key': tmdb_api_key, 'language': 'en-US', 'append_to_response': 'videos,credits'}
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        
+        # Получаем постер и backdrop
+        poster_path = data.get('poster_path')
+        backdrop_path = data.get('backdrop_path')
+        poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+        backdrop_url = f"https://image.tmdb.org/t/p/w1280{backdrop_path}" if backdrop_path else None
+        
+        # Получаем видео (трейлеры)
+        videos = data.get('videos', {}).get('results', [])
+        trailer = None
+        for video in videos:
+            if video.get('type') == 'Trailer' and video.get('site') == 'YouTube':
+                trailer = video.get('key')
+                break
+        
+        # Получаем актеров
+        credits = data.get('credits', {})
+        cast = credits.get('cast', [])[:10]  # Первые 10 актеров
+        
+        # Получаем жанры
+        genres = [g.get('name') for g in data.get('genres', [])]
+        
+        context = {
+            'media': data,
+            'poster_url': poster_url,
+            'backdrop_url': backdrop_url,
+            'trailer_key': trailer,
+            'cast': cast,
+            'genres': genres,
+            'media_type': media_type,
+            'media_id': media_id
+        }
+        
+        return render(request, 'cards/media_detail.html', context)
+        
+    except requests.RequestException as exc:
+        logger.error(f"Media detail request failed ({media_type}/{media_id}): {exc}")
+        messages.error(request, 'Не удалось загрузить информацию о фильме.')
+        return redirect('cards:media_center')
+
+@login_required
+@require_http_methods(["POST"])
+def generate_media_lexicon(request, media_type, media_id):
+    """
+    Генерирует лексику фильма/сериала через ИИ
+    """
+    try:
+        data = json.loads(request.body)
+        media_title = data.get('title', '')
+        
+        api_key = os.getenv('MISTRAL_API_KEY')
+        if not api_key:
+            return JsonResponse({'error': 'AI не настроен'}, status=500)
+        
+        # Промпт для генерации лексики
+        prompt = f"""Ты — эксперт по изучению английского языка через фильмы и сериалы.
+Проанализируй фильм/сериал "{media_title}" и создай список полезной лексики для изучения английского языка.
+
+Формат ответа (строго JSON):
+{{
+  "words": [
+    {{
+      "word": "слово на английском",
+      "translation": "перевод на русский",
+      "example": "пример использования из фильма или контекста",
+      "level": "A1/A2/B1/B2/C1/C2"
+    }}
+  ],
+  "phrases": [
+    {{
+      "phrase": "фраза на английском",
+      "translation": "перевод на русский",
+      "example": "пример использования",
+      "level": "A1/A2/B1/B2/C1/C2"
+    }}
+  ],
+  "grammar": [
+    {{
+      "topic": "грамматическая тема",
+      "explanation": "краткое объяснение",
+      "example": "пример из фильма"
+    }}
+  ]
+}}
+
+Требования:
+- Выбери 15-20 самых полезных слов
+- Выбери 5-10 полезных фраз
+- Укажи 2-3 грамматические темы
+- Примеры должны быть релевантными к фильму
+- Уровни сложности должны соответствовать CEFR
+- Ответ только JSON, без дополнительного текста"""
+
+        client = MistralClient(api_key=api_key)
+        chat_messages = [
+            ChatMessage(role="user", content=prompt)
+        ]
+        
+        resp = client.chat(model="mistral-small", messages=chat_messages, temperature=0.7)
+        raw_reply = resp.choices[0].message.content if getattr(resp, 'choices', None) else '{"words":[],"phrases":[],"grammar":[]}'
+        
+        # Очищаем от markdown
+        clean_reply = raw_reply.strip()
+        if clean_reply.startswith('```'):
+            lines = clean_reply.split('\n')
+            if lines[0].startswith('```'):
+                lines = lines[1:]
+            if lines and lines[-1].strip() == '```':
+                lines = lines[:-1]
+            clean_reply = '\n'.join(lines).strip()
+        
+        # Парсим JSON
+        try:
+            lexicon_data = json.loads(clean_reply)
+            return JsonResponse(lexicon_data)
+        except Exception as parse_err:
+            logger.warning(f"Failed to parse lexicon: {parse_err}. Raw: {raw_reply[:200]}")
+            return JsonResponse({
+                'error': 'Не удалось обработать ответ ИИ',
+                'words': [],
+                'phrases': [],
+                'grammar': []
+            })
+        
+    except Exception as e:
+        logger.error(f"Ошибка генерации лексики: {e}")
+        return JsonResponse({'error': 'Ошибка при генерации лексики'}, status=500)
+
 load_dotenv()
 
 @login_required
@@ -1657,6 +1808,11 @@ def api_tts(request):
         text = (data.get('text') or '').strip()
         force_provider = (data.get('provider') or 'auto').strip().lower()
         override_voice = (data.get('voice') or '').strip() or None
+        voice_type = (data.get('voice_type') or 'female').strip().lower()  # 'female' or 'male'
+        lang = (data.get('lang') or 'en-US').strip()  # Язык для озвучки
+        
+        logger.info(f"TTS request: text_length={len(text)}, voice_type={voice_type}, lang={lang}, provider={force_provider}")
+        
         if not text:
             return JsonResponse({'error': 'Пустой текст'}, status=400)
         
@@ -1667,8 +1823,25 @@ def api_tts(request):
         os.makedirs(abs_dir, exist_ok=True)
         abs_path = os.path.join(abs_dir, file_name)
 
-        # Параметры голосов: по умолчанию более натуральная женская русская
-        preferred_voice = override_voice or os.getenv('TTS_VOICE', 'ru-RU-SvetlanaNeural')
+        # Выбираем качественные английские Edge TTS голоса
+        if lang.startswith('en'):
+            if override_voice:
+                preferred_voice = override_voice
+            elif voice_type == 'male':
+                # Лучшие мужские английские голоса Edge TTS
+                preferred_voice = 'en-US-GuyNeural'  # Очень естественный и приятный
+                logger.info(f"✅ TTS: Selected MALE voice: {preferred_voice} (voice_type={voice_type})")
+            elif voice_type == 'female':
+                # Лучшие женские английские голоса Edge TTS
+                preferred_voice = 'en-US-AriaNeural'  # Очень естественный и приятный
+                logger.info(f"✅ TTS: Selected FEMALE voice: {preferred_voice} (voice_type={voice_type})")
+            else:
+                # По умолчанию женский голос, если voice_type не распознан
+                preferred_voice = 'en-US-AriaNeural'
+                logger.warning(f"⚠️ TTS: Unknown voice_type '{voice_type}', using default FEMALE voice: {preferred_voice}")
+        else:
+            # Для других языков используем старую логику
+            preferred_voice = override_voice or os.getenv('TTS_VOICE', 'ru-RU-SvetlanaNeural')
         azure_key = os.getenv('AZURE_TTS_KEY')
         azure_region = os.getenv('AZURE_TTS_REGION')
         azure_voice = os.getenv('AZURE_TTS_VOICE', preferred_voice)
@@ -1737,30 +1910,59 @@ def api_tts(request):
                 if edge_tts is not None:
                     try:
                         async def synth_edge():
-                            communicator = edge_tts.Communicate(text, preferred_voice, rate="-5%", pitch="+2%")
+                            # Для английского используем более естественные параметры
+                            if lang.startswith('en'):
+                                if voice_type == 'male':
+                                    rate = "-4%"
+                                    pitch = "-2%"
+                                else:  # female
+                                    rate = "-3%"
+                                    pitch = "+5%"
+                            else:
+                                rate = "-5%"
+                                pitch = "+2%"
+                            logger.info(f"TTS: voice={preferred_voice}, type={voice_type}, rate={rate}, pitch={pitch}")
+                            communicator = edge_tts.Communicate(text, preferred_voice, rate=rate, pitch=pitch)
                             await communicator.save(abs_path)
                         asyncio.run(synth_edge())
                     except Exception as edge_err:
                         logger.warning("Edge TTS failed, fallback gTTS. Error: %s", edge_err, exc_info=False)
-                        tts = gTTS(text=text, lang='ru', slow=False)
+                        tts_lang = 'en' if lang.startswith('en') else 'ru'
+                        tts = gTTS(text=text, lang=tts_lang, slow=False)
                         tts.save(abs_path)
                 else:
-                    tts = gTTS(text=text, lang='ru', slow=False)
+                    tts_lang = 'en' if lang.startswith('en') else 'ru'
+                    tts = gTTS(text=text, lang=tts_lang, slow=False)
                     tts.save(abs_path)
         else:
-            # 2) Если Azure нет — сначала Edge, затем gTTS
+            # 2) Если Azure нет — сначала Edge (приоритет для английского), затем gTTS
             if (force_provider in ('auto','edge')) and edge_tts is not None:
                 try:
                     async def synth_edge():
-                        communicator = edge_tts.Communicate(text, preferred_voice, rate="-5%", pitch="+2%")
+                        # Для английского используем более естественные параметры
+                        if lang.startswith('en'):
+                            if voice_type == 'male':
+                                rate = "-4%"
+                                pitch = "-2%"
+                            else:  # female
+                                rate = "-3%"
+                                pitch = "+5%"
+                        else:
+                            rate = "-5%"
+                            pitch = "+2%"
+                        logger.info(f"🎤 TTS synthesis: voice={preferred_voice}, type={voice_type}, rate={rate}, pitch={pitch}, text_length={len(text)}")
+                        communicator = edge_tts.Communicate(text, preferred_voice, rate=rate, pitch=pitch)
                         await communicator.save(abs_path)
+                        logger.info(f"✅ TTS file saved: {abs_path}")
                     asyncio.run(synth_edge())
                 except Exception as edge_err:
                     logger.warning("Edge TTS failed, fallback gTTS. Error: %s", edge_err, exc_info=False)
-                    tts = gTTS(text=text, lang='ru', slow=False)
+                    tts_lang = 'en' if lang.startswith('en') else 'ru'
+                    tts = gTTS(text=text, lang=tts_lang, slow=False)
                     tts.save(abs_path)
             else:
-                tts = gTTS(text=text, lang='ru', slow=False)
+                tts_lang = 'en' if lang.startswith('en') else 'ru'
+                tts = gTTS(text=text, lang=tts_lang, slow=False)
                 tts.save(abs_path)
 
         media_url = getattr(settings, 'MEDIA_URL', '/media/')
@@ -1775,35 +1977,65 @@ def api_tts(request):
 def api_asr(request):
     try:
         if 'audio' not in request.FILES:
+            logger.warning("api_asr: audio file not in request.FILES")
             return JsonResponse({'error': 'Файл audio не передан'}, status=400)
 
         audio_file = request.FILES['audio']
-        tmp_fd, tmp_path = tempfile.mkstemp(suffix='.webm')
+        logger.info(f"api_asr: received audio file, size: {audio_file.size}, name: {audio_file.name}, content_type: {audio_file.content_type}")
+        
+        if audio_file.size == 0:
+            logger.warning("api_asr: audio file is empty")
+            return JsonResponse({'error': 'Файл аудио пуст'}, status=400)
+        
+        # Определяем расширение файла
+        file_ext = '.webm'
+        if audio_file.name:
+            if '.mp4' in audio_file.name.lower():
+                file_ext = '.mp4'
+            elif '.ogg' in audio_file.name.lower():
+                file_ext = '.ogg'
+        elif audio_file.content_type:
+            if 'mp4' in audio_file.content_type:
+                file_ext = '.mp4'
+            elif 'ogg' in audio_file.content_type:
+                file_ext = '.ogg'
+        
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=file_ext)
         try:
             with os.fdopen(tmp_fd, 'wb') as tmp:
                 for chunk in audio_file.chunks():
                     tmp.write(chunk)
+            
+            logger.info(f"api_asr: saved audio to {tmp_path}, size: {os.path.getsize(tmp_path)} bytes")
 
             model = _get_whisper_model()
             if model is None:
-                return JsonResponse({'error': 'ASR не доступен на сервере'}, status=501)
+                logger.error("api_asr: Whisper model is not available")
+                return JsonResponse({'error': 'ASR не доступен на сервере. Убедитесь, что faster-whisper установлен.'}, status=501)
 
+            logger.info("api_asr: starting transcription")
             # Transcribe
-            segments, info = model.transcribe(tmp_path, vad_filter=True)
+            segments, info = model.transcribe(tmp_path, vad_filter=True, language='en')
             text_parts = []
             for seg in segments:
                 if getattr(seg, 'text', None):
                     text_parts.append(seg.text.strip())
             text = ' '.join(text_parts).strip()
+            
+            logger.info(f"api_asr: transcription completed, text length: {len(text)}")
+            if not text:
+                logger.warning("api_asr: transcription returned empty text")
+                return JsonResponse({'error': 'Не удалось распознать речь. Попробуйте говорить громче и четче.'}, status=400)
+            
             return JsonResponse({'text': text})
         finally:
             try:
                 os.remove(tmp_path)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"api_asr: failed to remove temp file {tmp_path}: {e}")
     except Exception as e:
-        logger.error(f"Ошибка api_asr: {e}")
-        return JsonResponse({'error': 'Серверная ошибка'}, status=500)
+        logger.error(f"Ошибка api_asr: {e}", exc_info=True)
+        return JsonResponse({'error': f'Серверная ошибка: {str(e)}'}, status=500)
 
 
 @login_required
@@ -1910,72 +2142,130 @@ def api_conversation_analytics(request):
 def media_feed(request):
     """
     Возвращает подборку англоязычного контента (фильмы, сериалы, мультфильмы)
-    с бесплатного API https://www.tvmaze.com/api.
+    с TMDB API (The Movie Database).
     """
     category = (request.GET.get('category') or 'movies').lower()
-    query_map = {
-        'movies': 'movie',
-        'series': 'english series',
-        'cartoons': 'animation'
-    }
-    query = query_map.get(category, 'movie')
-
+    tmdb_api_key = os.getenv('TMDB_API_KEY', '')
+    
+    # Если нет API ключа, используем публичный доступ (ограниченный)
+    if not tmdb_api_key:
+        tmdb_api_key = '1f54bd990f1cdfb230adb312546d765d'  # Публичный ключ для демо
+    
+    base_url = 'https://api.themoviedb.org/3'
+    headers = {'accept': 'application/json'}
+    
+    items = []
+    
     try:
-        response = requests.get(
-            'https://api.tvmaze.com/search/shows',
-            params={'q': query},
-            timeout=10
-        )
-        response.raise_for_status()
+        if category == 'movies':
+            # Популярные фильмы
+            url = f'{base_url}/movie/popular'
+            params = {'api_key': tmdb_api_key, 'language': 'en-US', 'page': 1}
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            for movie in data.get('results', [])[:20]:
+                if movie.get('original_language') != 'en':
+                    continue
+                
+                poster_path = movie.get('poster_path')
+                backdrop_path = movie.get('backdrop_path')
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                backdrop_url = f"https://image.tmdb.org/t/p/w1280{backdrop_path}" if backdrop_path else None
+                
+                overview = movie.get('overview', '')
+                if len(overview) > 200:
+                    overview = overview[:197] + '...'
+                
+                items.append({
+                    'id': movie.get('id'),
+                    'title': movie.get('title'),
+                    'summary': overview,
+                    'cover': poster_url,
+                    'backdrop': backdrop_url,
+                    'rating': round(movie.get('vote_average', 0), 1),
+                    'genres': [],  # Жанры будут отображаться на странице детального просмотра
+                    'release_date': movie.get('release_date'),
+                    'type': 'movie',
+                    'tmdb_id': movie.get('id')
+                })
+                
+        elif category == 'series':
+            # Популярные сериалы
+            url = f'{base_url}/tv/popular'
+            params = {'api_key': tmdb_api_key, 'language': 'en-US', 'page': 1}
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            for tv in data.get('results', [])[:20]:
+                if tv.get('original_language') != 'en':
+                    continue
+                
+                poster_path = tv.get('poster_path')
+                backdrop_path = tv.get('backdrop_path')
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                backdrop_url = f"https://image.tmdb.org/t/p/w1280{backdrop_path}" if backdrop_path else None
+                
+                overview = tv.get('overview', '')
+                if len(overview) > 200:
+                    overview = overview[:197] + '...'
+                
+                items.append({
+                    'id': tv.get('id'),
+                    'title': tv.get('name'),
+                    'summary': overview,
+                    'cover': poster_url,
+                    'backdrop': backdrop_url,
+                    'rating': round(tv.get('vote_average', 0), 1),
+                    'genres': [],  # Жанры будут отображаться на странице детального просмотра
+                    'release_date': tv.get('first_air_date'),
+                    'type': 'tv',
+                    'tmdb_id': tv.get('id')
+                })
+                
+        elif category == 'cartoons':
+            # Анимационные фильмы
+            url = f'{base_url}/discover/movie'
+            params = {
+                'api_key': tmdb_api_key,
+                'language': 'en-US',
+                'with_genres': '16',  # Animation genre ID
+                'page': 1
+            }
+            response = requests.get(url, params=params, headers=headers, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            for movie in data.get('results', [])[:20]:
+                if movie.get('original_language') != 'en':
+                    continue
+                
+                poster_path = movie.get('poster_path')
+                backdrop_path = movie.get('backdrop_path')
+                poster_url = f"https://image.tmdb.org/t/p/w500{poster_path}" if poster_path else None
+                backdrop_url = f"https://image.tmdb.org/t/p/w1280{backdrop_path}" if backdrop_path else None
+                
+                overview = movie.get('overview', '')
+                if len(overview) > 200:
+                    overview = overview[:197] + '...'
+                
+                items.append({
+                    'id': movie.get('id'),
+                    'title': movie.get('title'),
+                    'summary': overview,
+                    'cover': poster_url,
+                    'backdrop': backdrop_url,
+                    'rating': round(movie.get('vote_average', 0), 1),
+                    'genres': [],  # Жанры будут отображаться на странице детального просмотра
+                    'release_date': movie.get('release_date'),
+                    'type': 'movie',
+                    'tmdb_id': movie.get('id')
+                })
+                
+        return JsonResponse({'items': items[:20]})
+        
     except requests.RequestException as exc:
         logger.error(f"Media feed request failed ({category}): {exc}")
         return JsonResponse({'error': 'Не удалось загрузить подборку. Попробуйте позже.'}, status=502)
-
-    items = []
-    seen_ids = set()
-    for entry in response.json():
-        show = entry.get('show') or {}
-        show_id = show.get('id')
-        if not show_id or show_id in seen_ids:
-            continue
-        if show.get('language') and show.get('language') != 'English':
-            continue
-
-        genres = show.get('genres') or []
-        show_type = (show.get('type') or '').lower()
-        runtime = show.get('runtime') or 0
-
-        if category == 'cartoons' and 'Animation' not in genres and show.get('type') != 'Animation':
-            continue
-        if category == 'series' and show_type in ('tv movie',):
-            continue
-        if category == 'movies':
-            if show_type not in ('tv movie', 'animation') and runtime < 70:
-                continue
-
-        seen_ids.add(show_id)
-        summary_html = show.get('summary') or ''
-        summary_text = BeautifulSoup(summary_html, 'html.parser').get_text(' ', strip=True)
-        if len(summary_text) > 220:
-            summary_text = summary_text[:217].rsplit(' ', 1)[0] + '...'
-
-        image = show.get('image') or {}
-        cover = image.get('medium') or image.get('original') or ''
-        rating = (show.get('rating') or {}).get('average')
-
-        items.append({
-            'id': show_id,
-            'title': show.get('name'),
-            'summary': summary_text,
-            'cover': cover,
-            'rating': rating,
-            'genres': genres,
-            'url': show.get('url'),
-            'type': show.get('type'),
-            'premiered': show.get('premiered')
-        })
-
-        if len(items) >= 12:
-            break
-
-    return JsonResponse({'items': items})

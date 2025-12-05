@@ -316,87 +316,96 @@
 
   // Анализ теперь возвращает сам ИИ — дополнительный запрос не нужен
 
-  // Профессиональная озвучка ответов ИИ с выбором голоса
-  function playTTS(text){
+  // Профессиональная озвучка ответов ИИ с использованием Edge TTS (как настоящий человек)
+  let currentAudio = null; // Для управления воспроизведением
+  
+  async function playTTS(text){
     if (!text) return;
-    try{
+    
+    try {
       // Останавливаем предыдущую озвучку
-      speechSynthesis.cancel();
-      
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
-      utterance.rate = 0.85; // Немного медленнее для лучшего понимания
-      utterance.pitch = 1.1; // Чуть выше для более приятного звука
-      utterance.volume = 0.9;
-      
-      // Функция для поиска и установки голоса
-      function setVoice() {
-        const voiceType = document.querySelector('input[name="voice"]:checked').value;
-        const voices = speechSynthesis.getVoices();
-        
-        if (voices.length === 0) {
-          // Если голоса еще не загружены, ждем
-          setTimeout(setVoice, 100);
-          return;
-        }
-        
-        let selectedVoice = null;
-        if (voiceType === 'female') {
-          // Ищем качественный женский голос (расширенный поиск)
-          selectedVoice = voices.find(voice => 
-            voice.lang.startsWith('en') && 
-            (voice.name.toLowerCase().includes('female') || 
-             voice.name.toLowerCase().includes('samantha') || 
-             voice.name.toLowerCase().includes('karen') || 
-             voice.name.toLowerCase().includes('susan') ||
-             voice.name.toLowerCase().includes('victoria') || 
-             voice.name.toLowerCase().includes('zira') ||
-             voice.name.toLowerCase().includes('hazel') ||
-             voice.name.toLowerCase().includes('serena') ||
-             voice.name.toLowerCase().includes('helen') ||
-             voice.name.toLowerCase().includes('sarah') ||
-             voice.name.toLowerCase().includes('emma'))
-          );
-          // Если не нашли, берем любой женский голос
-          if (!selectedVoice) {
-            selectedVoice = voices.find(voice => 
-              voice.lang.startsWith('en') && 
-              (voice.name.toLowerCase().includes('woman') || 
-               voice.name.toLowerCase().includes('girl') ||
-               voice.name.toLowerCase().includes('female'))
-            );
-          }
-        } else {
-          // Ищем качественный мужской голос
-          selectedVoice = voices.find(voice => 
-            voice.lang.startsWith('en') && 
-            (voice.name.toLowerCase().includes('male') || 
-             voice.name.toLowerCase().includes('david') || 
-             voice.name.toLowerCase().includes('mark') || 
-             voice.name.toLowerCase().includes('alex') ||
-             voice.name.toLowerCase().includes('daniel') || 
-             voice.name.toLowerCase().includes('microsoft') ||
-             voice.name.toLowerCase().includes('richard') ||
-             voice.name.toLowerCase().includes('tom') ||
-             voice.name.toLowerCase().includes('john') ||
-             voice.name.toLowerCase().includes('mike'))
-          );
-        }
-        
-        if (selectedVoice) {
-          utterance.voice = selectedVoice;
-          console.log('Using voice:', selectedVoice.name, 'Type:', voiceType);
-        } else {
-          console.log('No specific voice found, using default');
-        }
-        
-        speechSynthesis.speak(utterance);
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+        currentAudio = null;
       }
       
-      // Запускаем поиск голоса
-      setVoice();
+      const voiceType = document.querySelector('input[name="voice"]:checked').value;
+      console.log('🎤 Selected voice type:', voiceType);
       
-    }catch(e){ console.log('TTS error:', e); }
+      // Отправляем запрос на сервер для генерации качественной озвучки через Edge TTS
+      const requestBody = {
+        text: text,
+        provider: 'edge', // Используем Edge TTS для максимального качества
+        voice_type: voiceType, // 'female' или 'male'
+        lang: 'en-US' // Английский язык
+      };
+      console.log('📤 Sending TTS request:', requestBody);
+      
+      const response = await fetch('{% url "cards:api_tts" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(requestBody)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📥 TTS response received:', data);
+      
+      if (data.error) {
+        console.error('❌ TTS error from server:', data.error);
+        throw new Error(data.error);
+      }
+      
+      if (!data.url) {
+        console.error('❌ No audio URL in response:', data);
+        throw new Error('No audio URL returned');
+      }
+      
+      console.log('🎵 Audio URL:', data.url, 'Voice type:', voiceType);
+      
+      // Воспроизводим аудио
+      const audio = new Audio(data.url);
+      currentAudio = audio;
+      
+      audio.onended = () => {
+        console.log('✅ Audio playback finished');
+        currentAudio = null;
+      };
+      
+      audio.onerror = (e) => {
+        console.error('❌ Audio playback error:', e);
+        append('error', 'Ошибка воспроизведения аудио');
+        currentAudio = null;
+      };
+      
+      // Начинаем воспроизведение
+      await audio.play();
+      console.log('✅ Playing TTS with Edge TTS, voice type:', voiceType, 'URL:', data.url);
+      
+    } catch (e) {
+      console.error('TTS error:', e);
+      append('error', 'Ошибка озвучки: ' + (e.message || 'Неизвестная ошибка'));
+      
+      // Fallback на встроенный speechSynthesis, если серверный TTS не работает
+      try {
+        speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        utterance.volume = 0.95;
+        speechSynthesis.speak(utterance);
+        console.log('⚠️ Using fallback speechSynthesis');
+      } catch (fallbackErr) {
+        console.error('Fallback TTS also failed:', fallbackErr);
+      }
+    }
   }
 
   // Переключение аватара при выборе голоса
@@ -488,27 +497,82 @@
   }
   
   async function startRec(){
+    // Проверка поддержки браузером
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      append('error', 'Ваш браузер не поддерживает запись аудио');
+      append('error', 'Ваш браузер не поддерживает запись аудио. Пожалуйста, используйте современный браузер (Chrome, Firefox, Edge, Safari).');
       return;
     }
     if (typeof MediaRecorder === 'undefined') {
-      append('error', 'Ваш браузер не поддерживает запись аудио');
+      append('error', 'Ваш браузер не поддерживает запись аудио. Пожалуйста, используйте современный браузер.');
+      return;
+    }
+    
+    // Проверка протокола (HTTPS или localhost)
+    const isSecure = window.location.protocol === 'https:' || 
+                     window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1';
+    if (!isSecure) {
+      append('error', 'Для доступа к микрофону требуется HTTPS или localhost. Текущий адрес: ' + window.location.href);
       return;
     }
     
     try {
-      mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'audio/webm' });
+      // Проверяем разрешения перед запросом
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' });
+      if (permissionStatus.state === 'denied') {
+        append('error', 'Доступ к микрофону запрещен. Пожалуйста, разрешите доступ в настройках браузера.');
+        return;
+      }
+      
+      // Запрашиваем доступ с более детальными параметрами
+      const constraints = {
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        }
+      };
+      
+      mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+      
+      // Проверяем, что поток действительно получен
+      if (!mediaStream || mediaStream.getAudioTracks().length === 0) {
+        append('error', 'Не удалось получить аудио поток. Проверьте настройки микрофона.');
+        return;
+      }
+      
+      // Пробуем разные форматы аудио
+      let mimeType = 'audio/webm';
+      if (!MediaRecorder.isTypeSupported('audio/webm')) {
+        if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          mimeType = 'audio/ogg';
+        } else {
+          mimeType = ''; // Браузер выберет сам
+        }
+      }
+      
+      const options = mimeType ? { mimeType: mimeType } : {};
+      mediaRecorder = new MediaRecorder(mediaStream, options);
       audioChunks = [];
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           audioChunks.push(event.data);
+          console.log('Audio chunk received, size:', event.data.size, 'total chunks:', audioChunks.length);
         }
       };
       
-      mediaRecorder.start();
+      mediaRecorder.onerror = (event) => {
+        console.error('MediaRecorder error:', event);
+        append('error', 'Ошибка записи аудио: ' + (event.error?.message || 'Неизвестная ошибка'));
+        stopRec();
+      };
+      
+      // Запускаем запись с интервалом сбора данных (каждые 1000мс)
+      // Это гарантирует, что данные будут собираться регулярно
+      mediaRecorder.start(1000);
       initSpeechRecognition();
       recognizedText = '';
       
@@ -520,9 +584,28 @@
         if (isRec) stopRec();
       }, MAX_RECORDING_TIME);
       
+      // Показываем успешное сообщение
+      append('ai', '🎤 Запись началась. Говорите...');
+      
     } catch (err) {
-      append('error', 'Не удалось получить доступ к микрофону');
       console.error('MediaRecorder start error:', err);
+      let errorMessage = 'Не удалось получить доступ к микрофону';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = 'Доступ к микрофону запрещен. Пожалуйста, разрешите доступ в настройках браузера и обновите страницу.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = 'Микрофон не найден. Убедитесь, что микрофон подключен и работает.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = 'Микрофон занят другим приложением. Закройте другие приложения, использующие микрофон.';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errorMessage = 'Микрофон не поддерживает требуемые параметры.';
+      } else if (err.name === 'SecurityError') {
+        errorMessage = 'Ошибка безопасности. Убедитесь, что страница загружена через HTTPS или localhost.';
+      } else if (err.message) {
+        errorMessage += ': ' + err.message;
+      }
+      
+      append('error', errorMessage);
     }
   }
   
@@ -531,6 +614,9 @@
     isRec = false;
     micBtn.classList.remove('recording');
     stopTimer();
+    
+    // Показываем индикацию обработки
+    append('ai', '⏳ Обработка записи...');
     
     if (stopTimeout) {
       clearTimeout(stopTimeout);
@@ -546,22 +632,57 @@
       }
     }
     
-    const recordedBlob = await stopMediaRecorder();
-    let finalText = (recognizedText || '').trim();
-    
-    if (!finalText) {
-      finalText = (await transcribeBlob(recordedBlob)).trim();
-    }
-    
-    if (finalText) {
-      sendToAI(finalText);
-    } else {
-      append('error', 'Не удалось распознать речь');
+    try {
+      const recordedBlob = await stopMediaRecorder();
+      
+      // Проверяем, что blob создан и не пустой
+      if (!recordedBlob || recordedBlob.size === 0) {
+        append('error', 'Запись пуста или не была создана. Попробуйте записать снова.');
+        return;
+      }
+      
+      console.log('Recorded blob size:', recordedBlob.size, 'bytes');
+      console.log('Recognized text (Web Speech API):', recognizedText);
+      
+      let finalText = (recognizedText || '').trim();
+      
+      // Если Web Speech API не распознал текст, используем серверную транскрипцию
+      if (!finalText) {
+        append('ai', '🎤 Распознавание речи на сервере...');
+        finalText = (await transcribeBlob(recordedBlob)).trim();
+      }
+      
+      if (finalText) {
+        console.log('Final recognized text:', finalText);
+        // Удаляем сообщение "Обработка записи..."
+        const messages = log.querySelectorAll('.msg.ai');
+        if (messages.length > 0 && messages[messages.length - 1].textContent.includes('Обработка записи')) {
+          messages[messages.length - 1].remove();
+        }
+        if (messages.length > 0 && messages[messages.length - 1].textContent.includes('Распознавание речи')) {
+          messages[messages.length - 1].remove();
+        }
+        sendToAI(finalText);
+      } else {
+        // Удаляем сообщение "Обработка записи..."
+        const messages = log.querySelectorAll('.msg.ai');
+        if (messages.length > 0 && messages[messages.length - 1].textContent.includes('Обработка записи')) {
+          messages[messages.length - 1].remove();
+        }
+        if (messages.length > 0 && messages[messages.length - 1].textContent.includes('Распознавание речи')) {
+          messages[messages.length - 1].remove();
+        }
+        append('error', 'Не удалось распознать речь. Убедитесь, что вы говорили достаточно громко и четко.');
+      }
+    } catch (err) {
+      console.error('Error in stopRec:', err);
+      append('error', 'Ошибка при обработке записи: ' + (err.message || 'Неизвестная ошибка'));
     }
   }
   
   function stopMediaRecorder(){
     if (!mediaRecorder) {
+      console.log('No mediaRecorder to stop');
       if (mediaStream) {
         mediaStream.getTracks().forEach(track => track.stop());
         mediaStream = null;
@@ -570,53 +691,115 @@
     }
     
     const recorder = mediaRecorder;
+    const chunks = [...audioChunks]; // Копируем массив
     mediaRecorder = null;
     
     return new Promise(resolve => {
-      recorder.addEventListener('stop', () => {
+      // Устанавливаем таймаут на случай, если событие 'stop' не сработает
+      const timeout = setTimeout(() => {
+        console.warn('MediaRecorder stop timeout, resolving with available chunks');
         if (mediaStream) {
           mediaStream.getTracks().forEach(track => track.stop());
           mediaStream = null;
         }
-        if (!audioChunks.length) {
+        if (!chunks.length) {
           resolve(null);
         } else {
-          const blob = new Blob(audioChunks, { type: recorder.mimeType || 'audio/webm' });
-          audioChunks = [];
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          console.log('Created blob from timeout, size:', blob.size);
+          resolve(blob);
+        }
+      }, 2000); // 2 секунды таймаут
+      
+      recorder.addEventListener('stop', () => {
+        clearTimeout(timeout);
+        console.log('MediaRecorder stopped, chunks count:', chunks.length);
+        
+        if (mediaStream) {
+          mediaStream.getTracks().forEach(track => track.stop());
+          mediaStream = null;
+        }
+        
+        if (!chunks.length) {
+          console.warn('No audio chunks collected');
+          resolve(null);
+        } else {
+          // Собираем все чанки в один blob
+          const totalSize = chunks.reduce((sum, chunk) => sum + (chunk.size || 0), 0);
+          console.log('Total audio chunks size:', totalSize, 'bytes');
+          
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          console.log('Created blob, size:', blob.size, 'type:', blob.type);
           resolve(blob);
         }
       }, { once: true });
       
+      // Запрашиваем оставшиеся данные перед остановкой
       try {
+        if (recorder.state === 'recording') {
+          recorder.requestData(); // Запрашиваем последние данные
+        }
         recorder.stop();
       } catch (e) {
-        console.log('Recorder stop error:', e);
-        resolve(null);
+        console.error('Recorder stop error:', e);
+        clearTimeout(timeout);
+        // Пытаемся создать blob из того, что есть
+        if (chunks.length > 0) {
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          resolve(blob);
+        } else {
+          resolve(null);
+        }
       }
     });
   }
   
   async function transcribeBlob(blob){
-    if (!blob) return '';
+    if (!blob || blob.size === 0) {
+      console.error('Empty blob provided to transcribeBlob');
+      return '';
+    }
+    
     try {
       const formData = new FormData();
-      formData.append('audio', blob, 'speech.webm');
+      // Определяем правильное расширение файла в зависимости от типа
+      let filename = 'speech.webm';
+      if (blob.type.includes('mp4')) {
+        filename = 'speech.mp4';
+      } else if (blob.type.includes('ogg')) {
+        filename = 'speech.ogg';
+      }
+      formData.append('audio', blob, filename);
+      
+      console.log('Sending audio to server, size:', blob.size, 'type:', blob.type);
       
       const resp = await fetch('{% url "cards:api_asr" %}', {
         method: 'POST',
         headers: { 'X-CSRFToken': getCookie('csrftoken') },
         body: formData
       });
+      
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        console.error('ASR server error:', resp.status, errorText);
+        throw new Error(`Сервер вернул ошибку: ${resp.status}`);
+      }
+      
       const data = await resp.json();
+      console.log('ASR response:', data);
+      
       if (data.text) {
         return data.text;
       }
       if (data.error) {
-        append('error', data.error);
+        console.error('ASR error:', data.error);
+        append('error', 'Ошибка распознавания: ' + data.error);
+      } else {
+        console.warn('ASR returned no text and no error');
       }
     } catch (err) {
       console.error('ASR request failed:', err);
-      append('error', 'Ошибка отправки аудио на сервер');
+      append('error', 'Ошибка отправки аудио на сервер: ' + (err.message || 'Неизвестная ошибка'));
     }
     return '';
   }

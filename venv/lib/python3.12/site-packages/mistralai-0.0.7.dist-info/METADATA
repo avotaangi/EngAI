@@ -1,0 +1,60 @@
+Metadata-Version: 2.1
+Name: mistralai
+Version: 0.0.7
+Summary: 
+Author: Bam4d
+Author-email: bam4d@mistral.ai
+Requires-Python: >=3.8,<4.0
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Dist: aiohttp (>=3.9.1,<4.0.0)
+Requires-Dist: backoff (>=2.2.1,<3.0.0)
+Requires-Dist: orjson (>=3.9.10,<4.0.0)
+Requires-Dist: pydantic (>=2.5.2,<3.0.0)
+Requires-Dist: requests (>=2.31.0,<3.0.0)
+Description-Content-Type: text/markdown
+
+# Mistral Python Client
+
+You can use the Mistral Python client to interact with the Mistral AI API.
+
+This client uses `poetry` as a dependency and virtual environment manager.
+
+You can install poetry with
+
+```bash
+pip install poetry
+```
+
+## Installing
+
+`poetry` will set up a virtual environment and install dependencies with the following command:
+
+```bash
+poetry install
+```
+
+## Run examples
+
+You can run the examples in the `examples/` directory using `poetry run` or by entering the virtual environment using `poetry shell`.
+
+### Using poetry run
+
+```bash
+cd examples
+poetry run python chat_no_streaming.py
+```
+
+### Using poetry shell
+
+```bash
+poetry shell
+cd examples
+
+>> python chat_no_streaming.py
+```
+

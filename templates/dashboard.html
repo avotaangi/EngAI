@@ -34,6 +34,37 @@
             </button>
         </div>
 
+        <!-- Проверка уровня языка -->
+        <div class="level-test-section">
+            <div class="level-test-card">
+                <div class="level-test-header">
+                    <div class="level-test-icon">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <div class="level-test-content">
+                        <h3>Проверка уровня языка</h3>
+                        <p>Определите свой уровень английского и получите персональные рекомендации</p>
+                    </div>
+                </div>
+                {% if has_completed_test and last_test %}
+                <div class="level-test-result">
+                    <div class="level-badge level-{{ last_test.detected_level|lower }}">
+                        <span class="level-label">Ваш уровень</span>
+                        <span class="level-value">{{ last_test.detected_level }}</span>
+                    </div>
+                    <div class="test-score">
+                        <span class="score-value">{{ last_test.score }}/{{ last_test.max_score }}</span>
+                        <span class="score-label">баллов</span>
+                    </div>
+                </div>
+                {% endif %}
+                <a href="{% url 'level_test' %}" class="level-test-btn">
+                    <i class="bi bi-play-circle"></i>
+                    {% if has_completed_test %}Пройти тест заново{% else %}Начать тест{% endif %}
+                </a>
+            </div>
+        </div>
+
         <!-- Картинка/иллюстрация -->
         <div class="illustration-section">
             <div class="illustration-card">

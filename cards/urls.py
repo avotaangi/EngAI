@@ -23,6 +23,8 @@ urlpatterns = [
     path('sidebar-chat/', views.sidebar_chat, name='sidebar_chat'),
     path('ai-speak/', views.ai_speak, name='ai_speak'),
     path('media-center/', views.media_center, name='media_center'),
+    path('media/<str:media_type>/<int:media_id>/', views.media_detail, name='media_detail'),
+    path('media/<str:media_type>/<int:media_id>/generate-lexicon/', views.generate_media_lexicon, name='generate_media_lexicon'),
 
     # Маршрут для экспорта модуля в Word
 

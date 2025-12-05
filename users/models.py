@@ -628,3 +628,35 @@ class Payment(models.Model):
     
     def __str__(self):
         return f"{self.user.email} - {self.amount} {self.currency} ({self.get_status_display()})"
+
+
+class LanguageLevelTest(models.Model):
+    """Модель теста для определения уровня языка"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='language_tests', verbose_name='Пользователь')
+    questions = models.JSONField(verbose_name='Вопросы теста', help_text='Список вопросов с ответами пользователя', null=True, blank=True, default=list)
+    answers = models.JSONField(verbose_name='Ответы пользователя', default=list, blank=True)
+    ai_analysis = models.JSONField(verbose_name='Анализ AI', null=True, blank=True)
+    detected_level = models.CharField(
+        max_length=2,
+        choices=[('A1', 'A1'), ('A2', 'A2'), ('B1', 'B1'), ('B2', 'B2'), ('C1', 'C1'), ('C2', 'C2')],
+        null=True,
+        blank=True,
+        verbose_name='Определенный уровень'
+    )
+    recommended_topics = models.JSONField(verbose_name='Рекомендуемые темы', default=list, blank=True)
+    score = models.IntegerField(null=True, blank=True, verbose_name='Балл')
+    max_score = models.IntegerField(default=100, verbose_name='Максимальный балл')
+    completed_at = models.DateTimeField(null=True, blank=True, verbose_name='Завершен')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создан')
+    
+    class Meta:
+        verbose_name = 'Тест уровня языка'
+        verbose_name_plural = 'Тесты уровня языка'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        level = self.detected_level or 'Не определен'
+        return f"{self.user.email} - {level} ({self.created_at.strftime('%d.%m.%Y')})"
+    
+    def is_completed(self):
+        return self.completed_at is not None

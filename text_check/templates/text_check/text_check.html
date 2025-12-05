@@ -534,38 +534,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeHistoryBtn = document.getElementById('closeHistoryBtn');
     const historyList = document.getElementById('historyList');
     
-    // Демонстрация интерфейса при загрузке страницы
-    setTimeout(() => {
-        results.style.display = 'flex';
-        correctedText.textContent = 'This is a demo of the corrected text. You can see how it works.';
-        
-        // Демонстрационные ошибки
-        errorsList.innerHTML = `
-            <div class="error-item">
-                <div class="error-text">Demo error 1</div>
-                <div class="correction">Исправление: This is a demonstration of error correction</div>
-            </div>
-            <div class="error-item">
-                <div class="error-text">Demo error 2</div>
-                <div class="correction">Исправление: Another example of error correction</div>
-            </div>
-        `;
-        
-        // Демонстрационные темы
-        themesList.innerHTML = `
-            <div class="theme-card">
-                <h4>Демо-тема 1</h4>
-                <p>Это демонстрация карточки темы для изучения</p>
-            </div>
-            <div class="theme-card">
-                <h4>Демо-тема 2</h4>
-                <p>Еще один пример карточки темы для изучения</p>
-            </div>
-        `;
-        
-        // Показываем демо-диаграмму
-        showDemoChart();
-    }, 500);
+    // Убираем демонстрацию при загрузке - результаты будут показываться только после проверки
 
     // Тестовые данные для истории
     const demoHistory = [
@@ -726,6 +695,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Показываем состояние загрузки
+        checkButton.disabled = true;
+        checkButton.innerHTML = '<i class="bi bi-hourglass-split"></i> Проверка...';
+        results.style.display = 'none';
+
         try {
             const response = await fetch('/text-check/check/', {
                 method: 'POST',
@@ -746,72 +720,62 @@ document.addEventListener('DOMContentLoaded', function() {
                 correctedText.textContent = data.corrected_text;
                 
                 // Отображаем ошибки
-                errorsList.innerHTML = data.errors.map(error => `
-                    <div class="error-item">
-                        <div class="error-text">${error.text}</div>
-                        <div class="correction">Исправление: ${error.correction}</div>
-                    </div>
-                `).join('');
+                if (data.errors && data.errors.length > 0) {
+                    errorsList.innerHTML = data.errors.map(error => `
+                        <div class="error-item">
+                            <div class="error-text">${escapeHtml(error.text)} → ${escapeHtml(error.correction)}</div>
+                            <div class="correction">Тип ошибки: ${escapeHtml(error.type)}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    errorsList.innerHTML = '<div class="error-item" style="background: #f0f8f0; border-left-color: #4caf50;"><div class="correction" style="color: #4caf50;">Отлично! Ошибок не найдено.</div></div>';
+                }
                 
                 // Отображаем темы
-                themesList.innerHTML = data.themes.map(theme => `
-                    <div class="theme-card">
-                        <h4>${theme.name}</h4>
-                        <p>${theme.description}</p>
-                    </div>
-                `).join('');
+                if (data.themes && data.themes.length > 0) {
+                    themesList.innerHTML = data.themes.map(theme => `
+                        <div class="theme-card">
+                            <h4>${escapeHtml(theme.name)}</h4>
+                            <p>${escapeHtml(theme.description)}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    themesList.innerHTML = '<p style="color: #666;">Темы для повторения не требуются</p>';
+                }
                 
-                // Показываем демонстрационную диаграмму
+                // Обновляем темы (word topics) из topics массива
+                const wordTopicsList = document.getElementById('wordTopicsList');
+                if (data.topics && data.topics.length > 0) {
+                    wordTopicsList.innerHTML = data.topics.map(topic => `
+                        <span class="topic-tag">${escapeHtml(topic)}</span>
+                    `).join('');
+                } else {
+                    wordTopicsList.innerHTML = '<span style="color: #666;">Темы не определены</span>';
+                }
+                
+                // Обновляем диаграмму с реальными данными
                 setTimeout(() => {
-                    showDemoChart();
-                }, 500);
+                    updateAnalysis(data.errors || [], data.themes || []);
+                }, 100);
             } else {
-                alert('Произошла ошибка при проверке текста');
+                alert(data.message || 'Произошла ошибка при проверке текста');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('Произошла ошибка при отправке запроса');
-            
-            // В случае ошибки показываем демо-данные для отладки интерфейса
-            results.style.display = 'flex';
-            correctedText.textContent = 'I went to the store yesterday and bought some food.';
-            
-            errorsList.innerHTML = `
-                <div class="error-item">
-                    <div class="error-text">have went → went</div>
-                    <div class="correction">Исправление: Неправильная форма прошедшего времени</div>
-                </div>
-                <div class="error-item">
-                    <div class="error-text">yestarday → yesterday</div>
-                    <div class="correction">Исправление: Ошибка правописания</div>
-                </div>
-                <div class="error-item">
-                    <div class="error-text">buyed → bought</div>
-                    <div class="correction">Исправление: Неправильная форма прошедшего времени для неправильного глагола</div>
-                </div>
-            `;
-            
-            themesList.innerHTML = `
-                <div class="theme-card">
-                    <h4>Прошедшее время</h4>
-                    <p>Повторите правила использования прошедшего времени в английском языке</p>
-                </div>
-                <div class="theme-card">
-                    <h4>Неправильные глаголы</h4>
-                    <p>Обратите внимание на формы неправильных глаголов</p>
-                </div>
-                <div class="theme-card">
-                    <h4>Правописание</h4>
-                    <p>Повторите правила правописания слов с -day</p>
-                </div>
-            `;
-            
-            // Показываем демонстрационную диаграмму
-            setTimeout(() => {
-                showDemoChart();
-            }, 500);
+            alert('Произошла ошибка при отправке запроса. Проверьте подключение к интернету.');
+        } finally {
+            // Восстанавливаем кнопку
+            checkButton.disabled = false;
+            checkButton.innerHTML = '<i class="bi bi-check2-circle"></i> Проверить';
         }
     });
+
+    // Функция для экранирования HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
     historyButton.addEventListener('click', function() {
         historyOffcanvas.classList.add('open');
@@ -827,18 +791,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateAnalysis(errors, themes) {
-        // Обновляем список тем
-        const wordTopicsList = document.getElementById('wordTopicsList');
-        wordTopicsList.innerHTML = themes.map(theme => `
-            <span class="topic-tag">${theme.name}</span>
-        `).join('');
-
         // Создаем график ошибок
         const ctx = document.getElementById('errorsChart').getContext('2d');
         const errorTypes = {};
-        errors.forEach(error => {
-            errorTypes[error.type] = (errorTypes[error.type] || 0) + 1;
-        });
+        if (errors && errors.length > 0) {
+            errors.forEach(error => {
+                const errorType = error.type || 'Other';
+                errorTypes[errorType] = (errorTypes[errorType] || 0) + 1;
+            });
+        }
 
         // Уничтожаем предыдущий график, если он существует
         if (window.errorsChart) {
@@ -848,6 +809,65 @@ document.addEventListener('DOMContentLoaded', function() {
         // Общее количество ошибок        
         const totalErrors = Object.values(errorTypes).reduce((a, b) => a + b, 0);
         
+        // Если нет ошибок, показываем пустой график
+        if (totalErrors === 0) {
+            const errorLabels = ['Нет ошибок'];
+            const errorData = [1];
+            
+            window.errorsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: errorLabels,
+                    datasets: [{
+                        data: errorData,
+                        backgroundColor: ['#4caf50'],
+                        borderWidth: 0,
+                        hoverOffset: 10
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            enabled: false
+                        }
+                    },
+                    cutout: '70%'
+                },
+                plugins: [{
+                    id: 'doughnutlabel',
+                    beforeDraw: function(chart) {
+                        const width = chart.width;
+                        const height = chart.height;
+                        const ctx = chart.ctx;
+                        
+                        ctx.restore();
+                        const fontSize = (height / 114).toFixed(2);
+                        ctx.textBaseline = 'middle';
+                        
+                        ctx.fillStyle = '#4caf50';
+                        ctx.font = 'bold ' + (fontSize * 1.5) + 'em sans-serif';
+                        const text = '0';
+                        const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                        const textY = height / 2 - 10;
+                        ctx.fillText(text, textX, textY);
+                        
+                        ctx.fillStyle = '#666';
+                        ctx.font = fontSize + 'em sans-serif';
+                        ctx.fillText('ошибок', Math.round((width - ctx.measureText('ошибок').width) / 2), height / 2 + 20);
+                        
+                        ctx.save();
+                    }
+                }]
+            });
+            return;
+        }
+        
+        // График с ошибками
         window.errorsChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
@@ -888,25 +908,6 @@ document.addEventListener('DOMContentLoaded', function() {
                                 return `${context.label}: ${value} (${percentage}%)`;
                             }
                         }
-                    },
-                    doughnutlabel: {
-                        labels: [
-                            {
-                                text: totalErrors,
-                                font: {
-                                    size: '36',
-                                    weight: 'bold'
-                                },
-                                color: '#7c4dff'
-                            },
-                            {
-                                text: 'ошибок',
-                                font: {
-                                    size: '16'
-                                },
-                                color: '#666'
-                            }
-                        ]
                     }
                 },
                 cutout: '70%'
@@ -987,20 +988,33 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="history-item">
                 <span class="date">${item.created_at}</span>
                 <div class="original-text">
-                    ${item.original_text}
+                    <strong>Исходный текст:</strong><br>
+                    ${escapeHtml(item.original_text)}
                 </div>
-                <span class="divider"></span>
+                ${item.corrected_text && item.corrected_text !== item.original_text ? `
+                <div class="corrected-text">
+                    <strong>Исправленный текст:</strong><br>
+                    ${escapeHtml(item.corrected_text)}
+                </div>
+                ` : ''}
+                ${item.errors && item.errors.length > 0 ? `
                 <div class="errors">
                     <strong>Найдено ошибок: ${item.errors.length}</strong>
                     ${item.errors.map(err => `
-                        <div class="error-item-small">${err.error_text}</div>
+                        <div class="error-item">
+                            <div class="error-text">${escapeHtml(err.error_text)} → ${escapeHtml(err.correction)}</div>
+                            <div class="correction">Тип: ${escapeHtml(err.error_type || 'Unknown')}</div>
+                        </div>
                     `).join('')}
                 </div>
+                ` : '<div class="errors"><strong>Ошибок не найдено</strong></div>'}
+                ${item.themes && item.themes.length > 0 ? `
                 <div class="themes">
                     ${item.themes.map(theme => `
-                        <span class="theme-tag">${theme.name}</span>
+                        <span class="theme-tag">${escapeHtml(theme.name)}</span>
                     `).join('')}
                 </div>
+                ` : ''}
             </div>
         `).join('');
     }

@@ -1,0 +1,105 @@
+{% extends 'users/base.html' %}
+{% load static %}
+
+{% block title %}Проверка уровня языка - EngAI{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/level-test.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="level-test-page">
+    <div class="level-test-container">
+        <!-- Заголовок -->
+        <div class="test-header">
+            <h1>Проверка уровня языка</h1>
+            <p class="test-subtitle">Определите свой уровень английского и получите персональные рекомендации</p>
+        </div>
+
+        <!-- Загрузка -->
+        <div class="test-loading" id="testLoading" style="display: none;">
+            <div class="loading-spinner"></div>
+            <p>Генерация вопросов...</p>
+        </div>
+
+        <!-- Вопросы -->
+        <div class="test-questions" id="testQuestions" style="display: none;">
+            <div class="test-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <span class="progress-text" id="progressText">Вопрос 1 из 20</span>
+            </div>
+
+            <div class="question-container" id="questionContainer">
+                <!-- Вопросы будут добавлены динамически -->
+            </div>
+
+            <div class="test-actions">
+                <button class="btn-test btn-prev" id="prevQuestionBtn" style="display: none;">Назад</button>
+                <button class="btn-test btn-next" id="nextQuestionBtn">Далее</button>
+                <button class="btn-test btn-submit" id="submitTestBtn" style="display: none;">Завершить тест</button>
+            </div>
+        </div>
+
+        <!-- Результаты -->
+        <div class="test-results" id="testResults" style="display: none;">
+            <div class="results-header">
+                <div class="result-level-badge" id="resultLevelBadge">
+                    <span class="result-level-label">Ваш уровень</span>
+                    <span class="result-level-value" id="resultLevelValue"></span>
+                </div>
+                <div class="result-score">
+                    <span class="result-score-value" id="resultScoreValue"></span>
+                    <span class="result-score-label">баллов</span>
+                </div>
+            </div>
+
+            <div class="result-analysis" id="resultAnalysis">
+                <!-- Анализ будет добавлен динамически -->
+            </div>
+
+            <div class="recommended-topics" id="recommendedTopics">
+                <h4>Рекомендуемые темы для изучения</h4>
+                <div class="topics-list" id="topicsList">
+                    <!-- Темы будут добавлены динамически -->
+                </div>
+            </div>
+
+            <div class="test-actions">
+                <a href="{% url 'dashboard' %}" class="btn-test btn-primary">Вернуться на главную</a>
+            </div>
+        </div>
+
+        <!-- Начальный экран -->
+        <div class="test-start" id="testStart">
+            <div class="start-content">
+                <div class="start-icon">
+                    <i class="bi bi-clipboard-check"></i>
+                </div>
+                <h2>Готовы начать?</h2>
+                <p>Тест состоит из 20 вопросов по грамматике, лексике и письму, которые помогут определить ваш уровень английского языка.</p>
+                <p class="test-info">Время прохождения: ~10-15 минут</p>
+                {% if has_completed_test and last_test %}
+                <div class="last-result">
+                    <p class="last-result-label">Последний результат:</p>
+                    <div class="last-result-info">
+                        <span class="last-level">Уровень: <strong>{{ last_test.detected_level }}</strong></span>
+                        <span class="last-score">Балл: <strong>{{ last_test.score }}/{{ last_test.max_score }}</strong></span>
+                    </div>
+                </div>
+                {% endif %}
+                <button class="btn-start-test" id="startTestBtn">
+                    <i class="bi bi-play-circle"></i>
+                    Начать тест
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/level-test.js' %}"></script>
+{% endblock %}
+
